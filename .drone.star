@@ -203,7 +203,7 @@ def ci_pipeline(ctx):
                 'export DOCKER_CONFIG=/tmp/testcontainers-docker-config',
                 'mkdir -p "$${DOCKER_CONFIG}"',
                 'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
-                'printf "{\\\"auths\\\":{\\\"%s\\\":{\\\"auth\\\":\\\"%%s\\\"}}}" "$${AUTH_VALUE}" > "$${DOCKER_CONFIG}/config.json"' % ARTIFACTORY_REGISTRY,
+                "printf '{\"auths\":{\"%s\":{\"auth\":\"%%s\"}}}\\n' \"$${AUTH_VALUE}\" > \"$${DOCKER_CONFIG}/config.json\"" % ARTIFACTORY_REGISTRY,
                 'TEST_START=$(date +%s)',
                 'mvn clean verify -Pci-testcontainers-snapshot',
                 'TEST_DURATION=$(($(date +%s)-TEST_START))',
