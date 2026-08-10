@@ -3,6 +3,7 @@ package uk.gov.ho.dacc.fdp.testcontainers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import redis.clients.jedis.Jedis;
@@ -13,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Tag("testcontainers")
 @Testcontainers(disabledWithoutDocker = true)
+@ExtendWith(TestcontainersFailureDiagnostics.class)
 class MinimalRedisTest {
 
     static final GenericContainer<?> REDIS =

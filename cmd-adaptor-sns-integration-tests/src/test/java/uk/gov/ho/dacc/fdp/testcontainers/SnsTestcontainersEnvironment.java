@@ -103,6 +103,7 @@ public final class SnsTestcontainersEnvironment {
 
     private static volatile boolean infrastructureStarted = false;
     private static volatile boolean applicationStarted = false;
+    private static volatile boolean networkClosed = false;
     private static volatile RuntimeException infrastructureStartupFailure;
     private static ConfigurableApplicationContext applicationContext;
     private static int applicationPort;
@@ -111,6 +112,9 @@ public final class SnsTestcontainersEnvironment {
     }
 
     public static synchronized void startInfrastructure() {
+        if (networkClosed) {
+            throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
+        }
         if (infrastructureStarted) {
             return;
         }
@@ -131,7 +135,8 @@ public final class SnsTestcontainersEnvironment {
         } catch (RuntimeException e) {
             infrastructureStarted = false;
             infrastructureStartupFailure = e;
-            stopAll();
+            dumpContainerLogs("infrastructure startup failure: " + e.getMessage());
+            shutdown();
             throw e;
         }
     }
@@ -197,11 +202,13 @@ public final class SnsTestcontainersEnvironment {
 
             LOG.info("Started cmd-adaptor-sns test application on port {}", applicationPort);
         } catch (RuntimeException e) {
+            dumpContainerLogs("application startup failure: " + e.getMessage());
             if (applicationContext != null) {
                 applicationContext.close();
                 applicationContext = null;
             }
             applicationStarted = false;
+            shutdown();
             throw e;
         }
     }
@@ -234,6 +241,43 @@ public final class SnsTestcontainersEnvironment {
         infrastructureStarted = false;
         if (applicationContext == null) {
             applicationStarted = false;
+        }
+    }
+
+    public static synchronized void shutdown() {
+        stopAll();
+        if (!networkClosed) {
+            NETWORK.close();
+            networkClosed = true;
+        }
+    }
+
+    public static synchronized void dumpContainerLogs(String reason) {
+        LOG.error("SNS Testcontainers diagnostics requested: {}", reason);
+        dumpContainerLog("redis", REDIS);
+        dumpContainerLog("zookeeper", ZOOKEEPER);
+        dumpContainerLog("kafka", KAFKA);
+        dumpContainerLog("schema-registry", SCHEMA_REGISTRY);
+        if (AGGREGATORS_ENABLED) {
+            dumpContainerLog("aggregate-party", AGGREGATE_PARTY);
+            dumpContainerLog("aggregate-object", AGGREGATE_OBJECT);
+            dumpContainerLog("aggregate-location", AGGREGATE_LOCATION);
+            dumpContainerLog("aggregate-event", AGGREGATE_EVENT);
+            dumpContainerLog("aggregate-service", AGGREGATE_SERVICE);
+        }
+    }
+
+    private static void dumpContainerLog(String name, GenericContainer<?> container) {
+        try {
+            if (container.getContainerId() == null) {
+                LOG.error("--- {} container was not created; no logs available ---", name);
+                return;
+            }
+
+            String logs = container.getLogs();
+            LOG.error("--- {} container logs begin ---\n{}\n--- {} container logs end ---", name, logs, name);
+        } catch (RuntimeException e) {
+            LOG.error("Unable to collect {} container logs", name, e);
         }
     }
 
@@ -523,5 +567,3 @@ public final class SnsTestcontainersEnvironment {
         }
     }
 }
-
-

@@ -10,10 +10,10 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.net.URI;
@@ -32,16 +32,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Tag("testcontainers")
 @Testcontainers(disabledWithoutDocker = true)
+@ExtendWith(TestcontainersFailureDiagnostics.class)
 class KafkaSchemaRegistrySmokeTest {
 
     @BeforeAll
     static void startInfrastructure() {
         SnsTestcontainersEnvironment.startInfrastructure();
-    }
-
-    @AfterAll
-    static void stopInfrastructure() {
-        SnsTestcontainersEnvironment.stopAll();
     }
 
     @Test
@@ -116,5 +112,4 @@ class KafkaSchemaRegistrySmokeTest {
                 "Registered schema should be retrievable from Schema Registry");
     }
 }
-
 

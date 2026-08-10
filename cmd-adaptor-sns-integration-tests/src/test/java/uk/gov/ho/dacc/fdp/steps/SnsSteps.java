@@ -14,6 +14,7 @@ import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import io.cucumber.plugin.EventListener;
 import io.cucumber.plugin.event.EventPublisher;
+import io.cucumber.plugin.event.Status;
 import io.cucumber.plugin.event.TestRunFinished;
 import io.cucumber.plugin.event.TestRunStarted;
 import lombok.SneakyThrows;
@@ -312,6 +313,9 @@ public class SnsSteps implements EventListener {
                     (KafkaConsumer<IdentityRecord, EntryRecord>) awakeConsumer(runlogCmdTopic);
         });
         eventPublisher.registerHandlerFor(TestRunFinished.class, event -> {
+            if (TESTCONTAINERS_ENABLED && event.getResult().getStatus() == Status.FAILED) {
+                SnsTestcontainersEnvironment.dumpContainerLogs("Cucumber test run failed");
+            }
             if (kafkaProducer != null) {
                 kafkaProducer.close();
             }
@@ -328,7 +332,7 @@ public class SnsSteps implements EventListener {
             closeQuietly(kafkaConsumerRunlogCmd);
 
             if (TESTCONTAINERS_ENABLED) {
-                SnsTestcontainersEnvironment.stopAll();
+                SnsTestcontainersEnvironment.shutdown();
             }
         });
     }

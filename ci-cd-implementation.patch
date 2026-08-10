@@ -1,0 +1,232 @@
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
+index 997d4be..3e098d8 100644
+--- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
+@@ -14,6 +14,7 @@ import io.cucumber.java.en.Then;
+ import io.cucumber.java.en.When;
+ import io.cucumber.plugin.EventListener;
+ import io.cucumber.plugin.event.EventPublisher;
++import io.cucumber.plugin.event.Status;
+ import io.cucumber.plugin.event.TestRunFinished;
+ import io.cucumber.plugin.event.TestRunStarted;
+ import lombok.SneakyThrows;
+@@ -312,6 +313,9 @@ public class SnsSteps implements EventListener {
+                     (KafkaConsumer<IdentityRecord, EntryRecord>) awakeConsumer(runlogCmdTopic);
+         });
+         eventPublisher.registerHandlerFor(TestRunFinished.class, event -> {
++            if (TESTCONTAINERS_ENABLED && event.getResult().getStatus() == Status.FAILED) {
++                SnsTestcontainersEnvironment.dumpContainerLogs("Cucumber test run failed");
++            }
+             if (kafkaProducer != null) {
+                 kafkaProducer.close();
+             }
+@@ -328,7 +332,7 @@ public class SnsSteps implements EventListener {
+             closeQuietly(kafkaConsumerRunlogCmd);
+ 
+             if (TESTCONTAINERS_ENABLED) {
+-                SnsTestcontainersEnvironment.stopAll();
++                SnsTestcontainersEnvironment.shutdown();
+             }
+         });
+     }
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/KafkaSchemaRegistrySmokeTest.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/KafkaSchemaRegistrySmokeTest.java
+index ab6f568..2766ee8 100644
+--- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/KafkaSchemaRegistrySmokeTest.java
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/KafkaSchemaRegistrySmokeTest.java
+@@ -10,10 +10,10 @@ import org.apache.kafka.clients.producer.KafkaProducer;
+ import org.apache.kafka.clients.producer.ProducerRecord;
+ import org.apache.kafka.common.serialization.StringDeserializer;
+ import org.apache.kafka.common.serialization.StringSerializer;
+-import org.junit.jupiter.api.AfterAll;
+ import org.junit.jupiter.api.BeforeAll;
+ import org.junit.jupiter.api.Tag;
+ import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
+ import org.testcontainers.junit.jupiter.Testcontainers;
+ 
+ import java.net.URI;
+@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
+ 
+ @Tag("testcontainers")
+ @Testcontainers(disabledWithoutDocker = true)
++@ExtendWith(TestcontainersFailureDiagnostics.class)
+ class KafkaSchemaRegistrySmokeTest {
+ 
+     @BeforeAll
+@@ -39,11 +40,6 @@ class KafkaSchemaRegistrySmokeTest {
+         SnsTestcontainersEnvironment.startInfrastructure();
+     }
+ 
+-    @AfterAll
+-    static void stopInfrastructure() {
+-        SnsTestcontainersEnvironment.stopAll();
+-    }
+-
+     @Test
+     void kafkaProduceConsumeRoundTrip() throws Exception {
+         String topic = "tc-kafka-smoke-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+@@ -117,4 +113,3 @@ class KafkaSchemaRegistrySmokeTest {
+     }
+ }
+ 
+-
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/MinimalRedisTest.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/MinimalRedisTest.java
+index 189ec03..c6b9fe8 100644
+--- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/MinimalRedisTest.java
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/MinimalRedisTest.java
+@@ -3,6 +3,7 @@ package uk.gov.ho.dacc.fdp.testcontainers;
+ import org.junit.jupiter.api.AfterEach;
+ import org.junit.jupiter.api.Tag;
+ import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
+ import org.testcontainers.containers.GenericContainer;
+ import org.testcontainers.junit.jupiter.Testcontainers;
+ import redis.clients.jedis.Jedis;
+@@ -13,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
+ 
+ @Tag("testcontainers")
+ @Testcontainers(disabledWithoutDocker = true)
++@ExtendWith(TestcontainersFailureDiagnostics.class)
+ class MinimalRedisTest {
+ 
+     static final GenericContainer<?> REDIS =
+@@ -66,4 +68,4 @@ class MinimalRedisTest {
+         assertEquals(1L, deleted);
+         assertNull(client.get(key));
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
+index 956f909..0370bbd 100644
+--- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
+@@ -103,6 +103,7 @@ public final class SnsTestcontainersEnvironment {
+ 
+     private static volatile boolean infrastructureStarted = false;
+     private static volatile boolean applicationStarted = false;
++    private static volatile boolean networkClosed = false;
+     private static volatile RuntimeException infrastructureStartupFailure;
+     private static ConfigurableApplicationContext applicationContext;
+     private static int applicationPort;
+@@ -111,6 +112,9 @@ public final class SnsTestcontainersEnvironment {
+     }
+ 
+     public static synchronized void startInfrastructure() {
++        if (networkClosed) {
++            throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
++        }
+         if (infrastructureStarted) {
+             return;
+         }
+@@ -131,7 +135,8 @@ public final class SnsTestcontainersEnvironment {
+         } catch (RuntimeException e) {
+             infrastructureStarted = false;
+             infrastructureStartupFailure = e;
+-            stopAll();
++            dumpContainerLogs("infrastructure startup failure: " + e.getMessage());
++            shutdown();
+             throw e;
+         }
+     }
+@@ -197,11 +202,13 @@ public final class SnsTestcontainersEnvironment {
+ 
+             LOG.info("Started cmd-adaptor-sns test application on port {}", applicationPort);
+         } catch (RuntimeException e) {
++            dumpContainerLogs("application startup failure: " + e.getMessage());
+             if (applicationContext != null) {
+                 applicationContext.close();
+                 applicationContext = null;
+             }
+             applicationStarted = false;
++            shutdown();
+             throw e;
+         }
+     }
+@@ -237,6 +244,43 @@ public final class SnsTestcontainersEnvironment {
+         }
+     }
+ 
++    public static synchronized void shutdown() {
++        stopAll();
++        if (!networkClosed) {
++            NETWORK.close();
++            networkClosed = true;
++        }
++    }
++
++    public static synchronized void dumpContainerLogs(String reason) {
++        LOG.error("SNS Testcontainers diagnostics requested: {}", reason);
++        dumpContainerLog("redis", REDIS);
++        dumpContainerLog("zookeeper", ZOOKEEPER);
++        dumpContainerLog("kafka", KAFKA);
++        dumpContainerLog("schema-registry", SCHEMA_REGISTRY);
++        if (AGGREGATORS_ENABLED) {
++            dumpContainerLog("aggregate-party", AGGREGATE_PARTY);
++            dumpContainerLog("aggregate-object", AGGREGATE_OBJECT);
++            dumpContainerLog("aggregate-location", AGGREGATE_LOCATION);
++            dumpContainerLog("aggregate-event", AGGREGATE_EVENT);
++            dumpContainerLog("aggregate-service", AGGREGATE_SERVICE);
++        }
++    }
++
++    private static void dumpContainerLog(String name, GenericContainer<?> container) {
++        try {
++            if (container.getContainerId() == null) {
++                LOG.error("--- {} container was not created; no logs available ---", name);
++                return;
++            }
++
++            String logs = container.getLogs();
++            LOG.error("--- {} container logs begin ---\n{}\n--- {} container logs end ---", name, logs, name);
++        } catch (RuntimeException e) {
++            LOG.error("Unable to collect {} container logs", name, e);
++        }
++    }
++
+     public static GenericContainer<?> redisContainer() {
+         startInfrastructure();
+         return REDIS;
+@@ -523,5 +567,3 @@ public final class SnsTestcontainersEnvironment {
+         }
+     }
+ }
+-
+-
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/TestcontainersFailureDiagnostics.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/TestcontainersFailureDiagnostics.java
+new file mode 100644
+index 0000000..f17e1dd
+--- /dev/null
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/TestcontainersFailureDiagnostics.java
+@@ -0,0 +1,31 @@
++package uk.gov.ho.dacc.fdp.testcontainers;
++
++import org.junit.jupiter.api.extension.BeforeAllCallback;
++import org.junit.jupiter.api.extension.ExtensionContext;
++import org.junit.jupiter.api.extension.TestWatcher;
++
++public final class TestcontainersFailureDiagnostics implements BeforeAllCallback, TestWatcher {
++    private static final ExtensionContext.Namespace NAMESPACE =
++            ExtensionContext.Namespace.create(TestcontainersFailureDiagnostics.class);
++    private static final String SUITE_RESOURCE = "sns-testcontainers-suite";
++
++    @Override
++    public void beforeAll(ExtensionContext context) {
++        context.getRoot()
++                .getStore(NAMESPACE)
++                .getOrComputeIfAbsent(SUITE_RESOURCE, key -> new SuiteResource(), SuiteResource.class);
++    }
++
++    @Override
++    public void testFailed(ExtensionContext context, Throwable cause) {
++        SnsTestcontainersEnvironment.dumpContainerLogs(
++                "JUnit test failed: " + context.getDisplayName() + " — " + cause.getMessage());
++    }
++
++    private static final class SuiteResource implements ExtensionContext.Store.CloseableResource {
++        @Override
++        public void close() {
++            SnsTestcontainersEnvironment.shutdown();
++        }
++    }
++}
