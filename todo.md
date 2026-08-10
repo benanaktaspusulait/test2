@@ -1,329 +1,770 @@
-Evet, bunu **sadece test discovery/parity kontrolü** için hedefli bir promptla kontrol ettirelim. Kod değiştirmesin; önce hangi testlerin gerçekten çalıştığını ve develop’a göre neyin kaybolduğunu net çıkarsın.
+Evet. Test-count parity temiz çıktı: **14 eski gerçek senaryo → 14 yeni gerçek senaryo, 0 skipped**. Şimdi kalan asıl soru artık test sayısı değil:
+
+> **Eski pipeline’daki her teknik sorumluluk yeni pipeline’da gerçekten karşılanıyor mu, yoksa bazı stage’ler sadece kaldırılmış mı?**
+
+Aşağıdaki prompt tam bunun için. Bu aşamada **kod değiştirmesin**; önce eksik fonksiyonu net bulsun. Özellikle `Aggregators`, `Pre-Integration Tests`, eski `Command Adaptor`, Compose infrastructure ve yeni Testcontainers uygulama startup yoluna odaklanıyor.
 
 ```text
-Perform a TEST DISCOVERY AND PARITY AUDIT for the current cmd-adaptor-sns branch.
+Perform a FINAL CI FUNCTIONAL PARITY AUDIT between the original develop
+pipeline and the current Testcontainers-based feature-branch pipeline.
 
-Do not modify any files.
+IMPORTANT:
+
+The test discovery / scenario parity audit has already been completed.
+
+Known result:
+
+- develop real cmd-adaptor-sns integration scenarios: 14
+- current Testcontainers real cmd-adaptor-sns integration scenarios: 14
+- failures: 0
+- errors: 0
+- skipped: 0
+
+Do NOT repeat the full test-count audit.
+
+This audit has a different purpose:
+
+Determine whether every IMPORTANT FUNCTIONAL RESPONSIBILITY of the old CI
+pipeline is still performed by the new pipeline, even though the old stages no
+longer exist separately.
+
+Do not modify any files yet.
 Do not create documentation.
-Do not create reports in the repository.
+Do not create markdown reports.
 Do not create another TODO.
 
-The purpose of this check is to determine whether the new Testcontainers CI path
-is fast because it is genuinely more efficient, or because some existing tests
-are no longer being discovered/executed.
+Use actual repository code, pipeline definitions, Maven configuration and
+develop-vs-feature-branch comparison.
 
-Use develop as the baseline.
+Do not infer equivalence from stage names.
 
 ============================================================
-1. ESTABLISH THE BASELINE
+1. ESTABLISH THE TWO PIPELINE MODELS
 ============================================================
+
+Inspect the pipeline definition on:
+
+A. origin/develop
+B. current feature branch
+
+Determine the exact old develop pipeline sequence and the exact current pipeline
+sequence.
+
+The old pipeline previously contained responsibilities/stages similar to:
+
+- RepoSync Version
+- Retrieve Artifactory Secrets
+- Wait for Docker
+- Extract Adaptor Information
+- Kafka & Redis
+- Aggregators
+- mvn clean install
+- Command Adaptor
+- Pre-Integration Tests
+- Testcontainers Smoke Tests
+- Integration Tests
+- Trivy
+
+The current pipeline visibly contains approximately:
+
+- RepoSync Version
+- Retrieve Artifactory Secrets
+- Wait for Docker
+- Extract Adaptor Information
+- Build and Test with Testcontainers
+- Build Command Adaptor Image
+- Scan with Trivy
+
+Do not rely on this list alone.
+
+Read the actual pipeline source and determine exact commands.
+
+============================================================
+2. BUILD A FUNCTIONAL RESPONSIBILITY MAP
+============================================================
+
+For every OLD stage, determine what technical responsibility it performed.
+
+Do not simply say:
+
+"removed"
+or
+"replaced by Testcontainers".
+
+Trace what the old stage actually did.
+
+For every old stage classify it as exactly one:
+
+- UNCHANGED
+- MERGED INTO CURRENT STEP
+- REPLACED BY TESTCONTAINERS
+- REPLACED BY MAVEN/TEST FIXTURE
+- NO LONGER REQUIRED — PROVEN
+- STILL REQUIRED BUT MISSING
+- UNKNOWN
+
+For MERGED / REPLACED classifications, identify the exact current code or command
+that now performs the responsibility.
+
+============================================================
+3. KAFKA & REDIS OLD STAGE
+============================================================
+
+Inspect the original "Kafka & Redis" stage.
+
+Determine exactly what it started/configured.
+
+Check:
+
+- Kafka image/version
+- Redis image/version
+- listeners
+- ports
+- topics
+- readiness
+- volumes
+- environment variables
+- Schema Registry relationship, if any
+- any initialization scripts
+
+Then inspect the current Testcontainers implementation.
+
+Verify that every Kafka/Redis capability required by the 14 application
+scenarios is now supplied through Testcontainers.
+
+Prove that the current integration tests do NOT depend on the old Compose
+Kafka/Redis instances.
+
+Check effective runtime configuration of cmd-adaptor-sns.
+
+Specifically verify that during the Testcontainers CI path the application uses:
+
+- dynamically resolved Kafka bootstrap servers
+- dynamically resolved Redis host/port
+- Testcontainers-provided Schema Registry URL where applicable
+
+Look for hidden fallbacks to:
+
+- localhost fixed ports
+- docker-compose hostnames
+- kafka:9092
+- redis:6379
+- environment-specific defaults
+
+If such fallback exists, classify as a regression.
+
+============================================================
+4. AGGREGATORS OLD STAGE — HIGH PRIORITY
+============================================================
+
+This is one of the most important checks.
+
+Inspect exactly what the old "Aggregators" stage did.
 
 Determine:
 
-- current branch
-- current HEAD
-- origin/develop or verified develop reference
-- merge base
+- which services/processes it started
+- which image/JAR/module it used
+- what Kafka topics it consumed
+- what Kafka topics it produced
+- whether it transformed/aggregated data needed by IntegrationTest
+- whether the 14 existing scenarios depended on its outputs
+- whether it populated Redis or any other state
+- whether it was just infrastructure or actual business-flow processing
 
-Use the correct merge-base comparison.
+Then trace the current Testcontainers tests.
 
-Do not assume that file count alone represents test coverage.
+For each old Aggregator responsibility, determine whether it is now:
 
-============================================================
-2. IDENTIFY THE COMPLETE EXISTING TEST SUITE ON DEVELOP
-============================================================
+A. executed in-process by the test/application
+B. represented by an existing repository stub/test double
+C. no longer required because the tested boundary changed
+D. still required but missing
 
-Inspect the develop version of the SNS integration-test module and determine the
-complete set of tests that are intended to execute.
+Do NOT accept:
 
-Check all relevant:
+"Tests pass without it"
 
-- test classes
-- test methods
-- base classes
-- inherited tests
-- JUnit tags
-- @Disabled / @Ignore
-- Maven profiles
-- Surefire configuration
-- Failsafe configuration
-- include/exclude patterns
-- test naming conventions
-- integration-test naming conventions
-- profile activation
-- CI Maven commands
+as proof that Aggregators are no longer required.
 
-Determine the effective DEVELOP baseline:
+Prove WHY they are no longer required or WHERE their responsibility moved.
 
-- total relevant test classes
-- total relevant test methods/scenarios
-- tests intentionally disabled on develop
-- tests excluded by design on develop
+Check whether assertions were changed in a way that simply avoids needing
+Aggregator output.
 
-Do not count unrelated unit tests.
+Compare relevant integration assertions against develop.
+
+If Aggregators previously represented a real part of the 14 scenarios and that
+behaviour is now missing rather than replaced, classify:
+
+    STILL REQUIRED BUT MISSING
 
 ============================================================
-3. IDENTIFY WHAT THE CURRENT TESTCONTAINERS CI PATH ACTUALLY RUNS
+5. OLD MAVEN CLEAN INSTALL STAGE
 ============================================================
 
-Inspect the current branch pipeline configuration.
+Inspect the old:
 
-Find the exact stage corresponding to:
+    mvn clean install
+
+command and reactor scope.
+
+Compare with the current:
+
+    mvn clean verify -Pci-testcontainers-snapshot
+
+or actual current command.
+
+Determine:
+
+- modules built before
+- modules built now
+- test phases executed before
+- test phases executed now
+- install vs verify implications
+- whether downstream stages previously relied on artifacts installed into the
+  local Maven repository
+- whether the new image build still receives the required application JAR
+- whether generated artifacts are equivalent
+
+Verify that removal of `install` does not accidentally omit something needed by:
+
+- image build
+- integration test module
+- generated schemas/classes
+- downstream modules
+
+If `verify` is sufficient, prove why from the reactor and artifact usage.
+
+============================================================
+6. OLD COMMAND ADAPTOR STAGE
+============================================================
+
+Inspect exactly what the old "Command Adaptor" stage did.
+
+Important:
+
+Do not use the displayed duration as Docker build duration.
+
+Determine separately whether the old stage:
+
+- built the image
+- started cmd-adaptor-sns as a Docker container
+- supplied configuration
+- mounted files
+- waited for readiness
+- kept the application running during Integration Tests
+- performed health checks
+- exposed ports
+- depended on Compose infrastructure
+
+Then inspect the new Testcontainers integration path.
+
+Determine how real cmd-adaptor-sns application behaviour is now executed.
+
+Possible legitimate replacements include:
+
+- Spring application context started directly by Maven tests
+- application component instantiated inside the integration-test JVM
+- another repository-standard test bootstrap
+
+Verify that the new tests are exercising REAL application processing and not only:
+
+- test helper logic
+- a mocked service
+- Kafka produce/consume smoke behaviour
+
+Trace at least one representative real scenario end to end:
+
+    test input
+        ->
+    Kafka input
+        ->
+    real cmd-adaptor-sns processing
+        ->
+    output/state
+        ->
+    existing business assertion
+
+Identify the exact production classes participating.
+
+If the old containerized Command Adaptor has been removed from the integration
+path, prove that the real application is now executed through an equivalent
+test bootstrap.
+
+============================================================
+7. PRE-INTEGRATION TESTS OLD STAGE — HIGH PRIORITY
+============================================================
+
+Inspect the exact old "Pre-Integration Tests" implementation.
+
+Determine what it did before the integration suite.
+
+Look for responsibilities such as:
+
+- topic creation
+- schema creation
+- schema registration
+- Kafka configuration
+- Redis initialization
+- test-data initialization
+- configuration generation
+- environment validation
+- readiness waiting
+- application health checking
+- artifact copying
+- certificate setup
+- template/resource preparation
+
+For every responsibility, find the equivalent current Testcontainers
+implementation.
+
+Classify every old responsibility as:
+
+- handled by shared Testcontainers fixture
+- handled by Maven/test setup
+- unnecessary with concrete technical reason
+- MISSING
+
+Do not assume container startup replaces all initialization.
+
+============================================================
+8. OLD TESTCONTAINERS SMOKE TESTS
+============================================================
+
+The old pipeline previously had a narrow:
+
+    Testcontainers Smoke Tests
+
+stage.
+
+The current parity analysis showed:
+
+- MinimalRedisTest is present but filtered
+- KafkaSchemaRegistrySmokeTest is present but filtered
+- smoke test count in current CI = 0
+- real SNS application scenarios = 14
+
+Determine whether excluding the standalone smoke tests is correct.
+
+Check whether the 14 real integration scenarios already exercise:
+
+- Redis startup/use
+- Kafka startup/use
+- Schema Registry startup/use
+- actual schema serialization/deserialization
+
+If the same infrastructure failure would cause the real integration suite to
+fail, then standalone smoke tests may legitimately be redundant in CI.
+
+If important infrastructure behaviour is ONLY covered by the filtered smoke
+tests and not the real suite, flag it.
+
+Do not require duplicate smoke tests merely for test-count symmetry.
+
+============================================================
+9. OLD INTEGRATION TESTS STAGE
+============================================================
+
+Inspect the old exact Integration Tests Maven command.
+
+Compare it with the current Testcontainers Maven command.
+
+Confirm that:
+
+- the same 14 relevant Cucumber/application scenarios are executed
+- feature files are still the same where applicable
+- step definitions remain meaningful
+- test data is equivalent
+- tags have not narrowed business coverage
+- failure scenarios still execute
+- assertions have not been weakened
+
+The previous parity audit already found 14 vs 14.
+
+This step should focus on BEHAVIOURAL equivalence, not recounting tests.
+
+============================================================
+10. TOPIC TEMPLATE / RESOURCE PREPARATION
+============================================================
+
+Inspect any topic-template/resource restoration or preparation that historically
+happened before integration execution.
+
+The current branch appears to have had changes around topic-template resources.
+
+Verify:
+
+- required topic templates still exist
+- required resources are copied/generated
+- current Testcontainers fixture uses the same semantically required topic
+  definitions
+- no resource was accidentally deleted during pilot cleanup
+- no required file is now being silently replaced with a simplified hard-coded
+  equivalent
+
+If templates are no longer required, prove which code replaced their behaviour.
+
+============================================================
+11. SCHEMA REGISTRY FUNCTIONAL PARITY
+============================================================
+
+Compare old and new Schema Registry behaviour.
+
+Determine:
+
+- how Schema Registry was supplied previously
+- what subjects/schemas were used
+- how schemas were registered
+- how application serializers/deserializers resolved them
+- whether compatibility settings mattered
+
+Verify the new Testcontainers path provides equivalent functionality.
+
+Do not count a successful standalone register/retrieve smoke operation as enough.
+
+The real application scenarios must use the Testcontainers Schema Registry where
+schema-backed messages are involved.
+
+============================================================
+12. APPLICATION CONFIGURATION PARITY
+============================================================
+
+Compare effective configuration between old Compose integration execution and
+new Testcontainers integration execution.
+
+Focus only on configuration relevant to tested behaviour.
+
+Check:
+
+- Kafka endpoints
+- Redis endpoints
+- Schema Registry
+- topic names
+- application ID
+- consumer group
+- serialization
+- retry configuration
+- polling
+- command/output topics
+- required feature flags
+
+Identify any branch change that changes BUSINESS behaviour rather than merely
+redirecting infrastructure endpoints.
+
+Infrastructure migration should not silently alter application semantics.
+
+============================================================
+13. EXTERNAL SERVICES / MOCKS / STUBS
+============================================================
+
+Determine whether any old integration scenario depended on services other than:
+
+- Redis
+- Kafka
+- Schema Registry
+- cmd-adaptor-sns
+
+If yes:
+
+- identify each service
+- determine how it was provided on develop
+- determine how it is provided now
+
+Look especially for old Compose services such as Aggregators or other helper
+services.
+
+If replaced by mocks/stubs:
+
+- check whether those mocks/stubs already existed on develop
+- check whether the replacement changes the integration boundary
+
+Flag newly introduced mocks that substantially reduce real integration coverage.
+
+============================================================
+14. PIPELINE ORDERING / DEPENDENCY PARITY
+============================================================
+
+Verify the new ordering is technically valid.
+
+Current shape appears approximately:
 
     Build and Test with Testcontainers
+        ->
+    Build Command Adaptor Image
+        ->
+    Trivy
 
-Determine the exact Maven command executed by that stage.
+Check whether any test previously validated the BUILT Docker image itself.
 
-Then determine the exact tests discovered by that command.
+If the old integration tests actually executed the Docker image produced by the
+pipeline, but the new tests execute application classes BEFORE the image is
+built, explicitly state this architectural difference.
 
-Report:
+Determine whether this matters for acceptance.
 
-- test classes discovered
-- test methods/scenarios discovered
-- tests executed
-- tests skipped
-- tests disabled
-- tests excluded
-- tests filtered out by tag/profile/include/exclude rules
+Distinguish:
 
-Do not infer from the stage name.
+A. application integration correctness
+B. container image runtime correctness
 
-Use the actual Maven/JUnit configuration.
+Verify that Story 1 image smoke/runtime validation still provides coverage for B.
 
-============================================================
-4. COMPARE DEVELOP VS CURRENT BRANCH
-============================================================
-
-Create an in-memory comparison of:
-
-A. tests executed on develop/default integration path
-B. tests executed on the current Testcontainers path
-
-Classify every relevant develop test as exactly one of:
-
-- EXECUTED IN TESTCONTAINERS
-- INTENTIONALLY NOT APPLICABLE
-- STILL COMPOSE-ONLY WITH CONCRETE TECHNICAL REASON
-- ACCIDENTALLY SKIPPED
-- ACCIDENTALLY EXCLUDED
-- DISABLED ON CURRENT BRANCH
-- NOT DISCOVERED
-- TEST REMOVED
-- UNKNOWN
-
-The main goal is to identify any test that existed in the develop integration
-coverage but is no longer exercised in the new Testcontainers CI path.
+Do not conflate Maven application tests with Docker image validation.
 
 ============================================================
-5. LOOK FOR SILENT COVERAGE REDUCTION
+15. BUILD COMMAND ADAPTOR IMAGE STAGE
 ============================================================
 
-Specifically inspect branch changes for:
+Inspect the current image-build stage.
 
-- @Disabled
-- @Ignore
-- disabledWithoutDocker
-- changed @Tag values
-- removed @Tag values
-- changed Maven groups/excludedGroups
-- Surefire includes/excludes
-- Failsafe includes/excludes
-- -Dtest
-- -Dit.test
-- -Dgroups
-- -DexcludedGroups
-- test class renames
-- test method renames
-- deleted test files
-- deleted test methods
-- inherited tests no longer discovered
-- changed profile activation
-- skipped modules
-- `-pl` scope changes
-- missing `-am`
-- changed test source directories
-- changed plugin execution phases
+Verify it still produces the expected:
 
-Also inspect CI shell conditions that may cause tests to be skipped.
+    docker-compose-command-adaptor:latest
+
+or actual required image.
+
+Check:
+
+- JAR source
+- required OTel JAR
+- runtime user
+- command
+- envconsul
+- expected image configuration
+
+Verify the Testcontainers pipeline restructuring did not accidentally stop
+building the production-equivalent command-adaptor image.
 
 ============================================================
-6. CHECK MAVEN OUTPUT
+16. BUILD CACHE IS NOT HIDING MISSING WORK
 ============================================================
 
-Run or inspect the exact Testcontainers Maven command.
+Because the current image build is around ~20 seconds, verify from BuildKit
+output that the speed is from valid cache reuse.
 
-Capture the effective Maven test summary.
+Look for evidence such as:
 
-For every module involved, identify:
+- setup layers CACHED
+- application JAR layer rebuilt when appropriate
+- image export completed
+- image inspect succeeded
 
-    Tests run:
-    Failures:
-    Errors:
-    Skipped:
+Do not interpret a skipped Docker build or stale pre-existing image as cache
+success.
 
-Do not rely only on the final reactor BUILD SUCCESS.
-
-A green Maven build is not sufficient if intended tests were skipped.
-
-If Maven output is split across Surefire and Failsafe, combine them correctly.
+Verify the resulting image was actually produced by the current pipeline run.
 
 ============================================================
-7. CHECK TEST REPORT FILES
+17. TRIVY PARITY
 ============================================================
 
-Inspect generated Surefire/Failsafe reports from the current run where available.
+Compare old and new Trivy execution.
 
-Use them to determine the exact executed test classes and test methods.
+Verify:
 
-Do not create or commit report files.
+- the same intended image/artifact is scanned
+- vulnerability scanning is not now scanning an older cached image
+- scan failure behaviour remains equivalent
+- no required scan was removed during pipeline simplification
 
-Use existing generated reports only for analysis.
-
-Check for:
-
-- skipped="true"
-- disabled tests
-- zero-test modules
-- classes with zero executed methods
-- tests filtered before execution
+Do not perform vulnerability analysis; only check pipeline responsibility parity.
 
 ============================================================
-8. CHECK DOCKER-SKIP BEHAVIOUR
+18. FAILURE BEHAVIOUR
 ============================================================
 
-Pay special attention to Testcontainers patterns such as:
+Compare failure semantics.
 
-    @Testcontainers(disabledWithoutDocker = true)
+Old pipeline should fail when important infrastructure/application checks fail.
 
-Determine whether any intended CI tests can silently become skipped when Docker
-is unavailable or incorrectly detected.
+Verify current pipeline fails when:
 
-In the current CI run, verify Docker is actually available and intended
-Testcontainers tests are NOT skipped because of this option.
+- Testcontainers cannot start
+- Kafka unavailable
+- Redis unavailable
+- Schema Registry unavailable
+- application cannot start
+- real integration scenario fails
+- Maven build fails
+- image build fails
+- Trivy gate fails where configured
 
-============================================================
-9. CHECK APPLICATION TESTS VS SMOKE TESTS
-============================================================
+Look for:
 
-Separate:
+    || true
+    set +e
+    swallowed exit codes
+    continue-on-error equivalents
+    shell constructs masking failure
 
-- Redis infrastructure smoke tests
-- Kafka infrastructure smoke tests
-- Schema Registry infrastructure smoke tests
-- real cmd-adaptor-sns application integration tests
-
-Report the count for each category.
-
-The CI path is NOT complete if only infrastructure smoke tests execute.
-
-The important number is how many real cmd-adaptor-sns integration scenarios are
-actually being exercised through Testcontainers.
+Flag any newly weakened failure gate.
 
 ============================================================
-10. CHECK COMPOSE-ONLY REMAINDERS
+19. TESTCONTAINERS DEPENDENCE ON EARLIER PIPELINE SERVICES
 ============================================================
 
-Identify tests still only executed through the old Compose/full-E2E path.
+This is a critical check.
 
-For each one state the exact technical reason.
+Verify the Testcontainers step is self-contained with respect to:
 
-If a test is technically suitable for the Testcontainers path but is missing
-from it, classify it as:
+- Redis
+- Kafka
+- Schema Registry
 
-    ACCIDENTALLY NOT MIGRATED
+It must not succeed only because some earlier pipeline stage has already started
+those services.
 
-Do not call it intentionally Compose-only without concrete evidence.
+Given the new pipeline no longer visibly has separate Kafka & Redis stages, this
+should be easier to prove.
+
+Search for static connection defaults and environment leakage.
 
 ============================================================
-11. VERIFY TEST COUNT DIFFERENCE IS EXPLAINABLE
+20. CLEAN ENVIRONMENT ASSUMPTION
 ============================================================
 
-If the counts differ between develop and current Testcontainers paths, explain
-every difference.
+Reason from pipeline configuration whether the Testcontainers stage would pass on
+a fresh CI worker with:
+
+- Docker available
+- repository cloned
+- required credentials available
+- NO pre-existing Kafka
+- NO pre-existing Redis
+- NO pre-existing Schema Registry
+- NO pre-existing command-adaptor container
+
+If not, identify the hidden dependency.
+
+Do not actually destroy infrastructure on the current machine to test this.
+
+============================================================
+21. EXPLAIN THE PERFORMANCE DIFFERENCE
+============================================================
+
+Based on actual old/new responsibilities, explain where the ~23 minute -> ~3
+minute change comes from.
+
+Break it down qualitatively.
 
 For example:
 
-    Develop relevant scenarios: 42
-    Testcontainers scenarios:    39
+- removed Compose environment startup
+- Aggregator containers no longer needed / replaced
+- application runs inside Maven test context rather than long-lived Docker flow
+- Testcontainers starts only required dependencies
+- BuildKit registry cache reduces image-build cost
+- old integration waiting/readiness path removed
+- reduced orchestration overhead
 
-The remaining 3 must each have a concrete classification and reason.
+Do NOT invent exact savings unless directly measurable from pipeline evidence.
 
-No unexplained test-count reduction is acceptable.
+Most importantly:
+
+State whether any meaningful old responsibility was lost to achieve the speedup.
 
 ============================================================
-12. DO NOT FIX ANYTHING YET
+22. FINAL RESPONSIBILITY TABLE
 ============================================================
 
-This pass is diagnostic only.
+Return a table in CHAT ONLY.
 
-Do not edit:
+Do not create a file.
 
-- Java code
-- Maven files
-- pipeline files
-- Docker files
-- test configuration
+Use columns:
 
-We first need to know whether anything has been skipped.
+OLD STAGE
+OLD RESPONSIBILITY
+CURRENT REPLACEMENT
+STATUS
+EVIDENCE
+
+Required rows include at minimum:
+
+- Kafka & Redis
+- Aggregators
+- mvn clean install
+- Command Adaptor
+- Pre-Integration Tests
+- Testcontainers Smoke Tests
+- Integration Tests
+- Trivy
+
+STATUS must be exactly one of:
+
+- PRESERVED
+- REPLACED EQUIVALENTLY
+- LEGITIMATELY REMOVED
+- MISSING
+- UNCERTAIN
 
 ============================================================
 FINAL RESPONSE
 ============================================================
 
-Return only this concise chat output:
+Return only:
 
-## Verdict
+## Overall Verdict
 
 Choose exactly one:
 
-- FULL PARITY
-- PARTIAL PARITY — EXPLAINED
-- TEST COVERAGE LOST
+- FULL FUNCTIONAL PARITY
+- FUNCTIONAL PARITY WITH EXPLAINED ARCHITECTURAL CHANGES
+- FUNCTIONAL GAP FOUND
 
-## Develop Baseline
+## Old-to-New Responsibility Map
 
-- relevant test classes:
-- relevant test methods/scenarios:
-- intentionally disabled/excluded:
+Provide the requested table.
 
-## Current Testcontainers CI
+## High-Risk Checks
 
-- exact Maven command:
-- test classes discovered:
-- test methods/scenarios executed:
-- failures:
-- errors:
-- skipped:
+State PASS / FAIL / UNCERTAIN for:
 
-## Coverage Difference
+- Aggregator responsibility preserved
+- Pre-Integration responsibility preserved
+- real cmd-adaptor-sns processing exercised
+- real 14 business scenarios preserved
+- application uses Testcontainers endpoints
+- no hidden Compose dependency
+- Schema Registry/Avro behaviour preserved
+- Docker image still built and runtime-valid
+- Trivy still scans the intended image
+- failure gates are not weakened
 
-For every develop test not executed through Testcontainers, list:
+## Architectural Differences
 
-- class
-- method/scenario where relevant
-- classification
-- exact reason
+List only meaningful differences between old and new execution models.
 
-## Smoke vs Application Coverage
+## Missing Functionality
 
-- Redis smoke tests:
-- Kafka smoke tests:
-- Schema Registry smoke tests:
-- real cmd-adaptor-sns integration scenarios:
+List only functionality that existed on develop and has no valid replacement.
 
-## Suspicious Findings
-
-List only concrete evidence of accidental skipping/exclusion.
-
-If none:
+Write:
 
     None
 
-## Conclusion
+if none exists.
 
-One sentence only:
-state whether the ~3 minute pipeline result appears to preserve test coverage or
-whether the speedup is partly caused by tests no longer running.
+## Performance Conclusion
+
+In no more than 5 sentences:
+
+Explain whether the approximately 23-minute to 3-minute improvement is
+technically credible based on the responsibility comparison.
+
+Explicitly state whether the speedup appears to come from orchestration
+simplification/optimisation or from lost functional coverage.
+
+DO NOT MODIFY ANY FILE.
+DO NOT CREATE DOCUMENTATION.
+DO NOT CREATE A TODO.
 ```
 
-Bu promptun amacı çok net: **“hangi testler gerçekten çalıştı?”** sorusuna cevap vermek. Özellikle `Tests run / Skipped / class-method parity` tarafını çıkarırsa, 3 dakikalık sürenin gerçek optimizasyon mu yoksa coverage kaybı mı olduğunu hemen anlarsın.
+Bu kontrol temiz çıkarsa artık üç ayrı şeyi kanıtlamış olacağız:
+
+1. **Scenario parity:** `14 → 14`, skip yok.
+2. **Functional responsibility parity:** eski stage’lerin yaptığı gerekli işler yeni yapıda karşılanıyor.
+3. **Pipeline integrity:** Docker image build + Trivy + gerçek application processing hâlâ var.
+
+Özellikle `Aggregators`, `Pre-Integration Tests` ve **“eski testler Docker container içindeki uygulamayı çalıştırıyordu, yeniler JVM içindeki application context’i mi çalıştırıyor?”** kısmını atlamamak lazım. Sonuncusu önemli; test coverage aynı olsa bile execution boundary değişmiş olabilir. Bu değişiklik yanlış olmak zorunda değil, ama bilinçli ve yeterli coverage ile desteklenmiş olması gerekiyor.
