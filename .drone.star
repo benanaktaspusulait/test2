@@ -200,7 +200,7 @@ def ci_pipeline(ctx):
             'image': MAVEN_JAVA17_IMAGE,
             'commands': [
                 '. ./set_drone_secrets.sh',
-                'unset DOCKER_API_VERSION',
+                'export DOCKER_API_VERSION=1.41',
                 'export DOCKER_CONFIG=/tmp/testcontainers-docker-config',
                 'mkdir -p "$${DOCKER_CONFIG}"',
                 'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
@@ -213,6 +213,7 @@ def ci_pipeline(ctx):
             ],
             'environment': {
                 'DOCKER_HOST': 'tcp://docker:2375',
+                'DOCKER_API_VERSION': '1.41',
                 'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
                 'TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX': 'docker.digital.homeoffice.gov.uk/',
                 'TESTCONTAINERS_RYUK_DISABLED': 'true',
@@ -257,7 +258,7 @@ def ci_pipeline(ctx):
             'image': MAVEN_JAVA17_IMAGE,
             'commands': [
                 '. ./set_drone_secrets.sh',
-                'unset DOCKER_API_VERSION',
+                'export DOCKER_API_VERSION=1.41',
                 'export DOCKER_CONFIG=/tmp/testcontainers-runtime-docker-config',
                 'mkdir -p "$${DOCKER_CONFIG}"',
                 'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
@@ -269,6 +270,7 @@ def ci_pipeline(ctx):
             ],
             'environment': {
                 'DOCKER_HOST': 'tcp://docker:2375',
+                'DOCKER_API_VERSION': '1.41',
                 'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
                 'TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX': 'docker.digital.homeoffice.gov.uk/',
                 'TESTCONTAINERS_RYUK_DISABLED': 'true'
