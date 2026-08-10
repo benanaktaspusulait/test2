@@ -20,6 +20,7 @@
         <sns.testcontainers.skip-if-docker-unavailable>true</sns.testcontainers.skip-if-docker-unavailable>
         <sns.testcontainers.aggregators.enabled>false</sns.testcontainers.aggregators.enabled>
         <sns.testcontainers.expected-scenarios>0</sns.testcontainers.expected-scenarios>
+        <docker.api.version>1.41</docker.api.version>
         <failsafe.includes>**/*IntegrationTest</failsafe.includes>
         <failsafe.excludes>none</failsafe.excludes>
         <cucumber.filter.tags/>
@@ -333,6 +334,8 @@
                         <sns.testcontainers.enabled>${sns.testcontainers.enabled}</sns.testcontainers.enabled>
                         <sns.testcontainers.skip-if-docker-unavailable>${sns.testcontainers.skip-if-docker-unavailable}</sns.testcontainers.skip-if-docker-unavailable>
                         <sns.testcontainers.aggregators.enabled>${sns.testcontainers.aggregators.enabled}</sns.testcontainers.aggregators.enabled>
+                        <docker.api.version>${docker.api.version}</docker.api.version>
+                        <DOCKER_API_VERSION>${docker.api.version}</DOCKER_API_VERSION>
                     </systemPropertyVariables>
                     <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                     <excludes>
@@ -367,6 +370,8 @@
                                 <sns.testcontainers.skip-if-docker-unavailable>${sns.testcontainers.skip-if-docker-unavailable}</sns.testcontainers.skip-if-docker-unavailable>
                                 <sns.testcontainers.aggregators.enabled>${sns.testcontainers.aggregators.enabled}</sns.testcontainers.aggregators.enabled>
                                 <sns.testcontainers.expected-scenarios>${sns.testcontainers.expected-scenarios}</sns.testcontainers.expected-scenarios>
+                                <docker.api.version>${docker.api.version}</docker.api.version>
+                                <DOCKER_API_VERSION>${docker.api.version}</DOCKER_API_VERSION>
                             </systemPropertyVariables>
                             <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                             <excludes>

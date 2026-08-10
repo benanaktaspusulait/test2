@@ -206,7 +206,7 @@ def ci_pipeline(ctx):
                 'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
                 "printf '{\"auths\":{\"%s\":{\"auth\":\"%%s\"}}}\\n' \"$${AUTH_VALUE}\" > \"$${DOCKER_CONFIG}/config.json\"" % ARTIFACTORY_REGISTRY,
                 'TEST_START=$(date +%s)',
-                'mvn clean verify -Pci-testcontainers-snapshot',
+                'DOCKER_API_VERSION=1.41 mvn -Ddocker.api.version=1.41 -DDOCKER_API_VERSION=1.41 clean verify -Pci-testcontainers-snapshot',
                 'TEST_DURATION=$(($(date +%s)-TEST_START))',
                 'echo "CI_TIMING name=testcontainers_verify duration_seconds=$${TEST_DURATION}"',
                 'if [ "$${TEST_DURATION}" -gt "$${TESTCONTAINERS_MAX_SECONDS}" ]; then echo "Testcontainers verify exceeded $${TESTCONTAINERS_MAX_SECONDS}s"; exit 1; fi'
@@ -264,7 +264,7 @@ def ci_pipeline(ctx):
                 'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
                 "printf '{\"auths\":{\"%s\":{\"auth\":\"%%s\"}}}\\n' \"$${AUTH_VALUE}\" > \"$${DOCKER_CONFIG}/config.json\"" % ARTIFACTORY_REGISTRY,
                 'RUNTIME_SMOKE_START=$(date +%s)',
-                'mvn -pl cmd-adaptor-sns-integration-tests -am verify -Pci-built-image-runtime-smoke -Dsns.runtime.image=docker-compose-command-adaptor:latest',
+                'DOCKER_API_VERSION=1.41 mvn -Ddocker.api.version=1.41 -DDOCKER_API_VERSION=1.41 -pl cmd-adaptor-sns-integration-tests -am verify -Pci-built-image-runtime-smoke -Dsns.runtime.image=docker-compose-command-adaptor:latest',
                 'RUNTIME_SMOKE_DURATION=$(($(date +%s)-RUNTIME_SMOKE_START))',
                 'echo "CI_TIMING name=built_image_runtime_smoke duration_seconds=$${RUNTIME_SMOKE_DURATION}"'
             ],
