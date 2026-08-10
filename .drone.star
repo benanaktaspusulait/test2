@@ -249,6 +249,34 @@ def ci_pipeline(ctx):
         }
     )
 
+    response = add_pipeline_step(
+        response,
+        {
+            'name': 'Validate Built Image Runtime',
+            'image': MAVEN_JAVA17_IMAGE,
+            'commands': [
+                '. ./set_drone_secrets.sh',
+                'export DOCKER_CONFIG=/tmp/testcontainers-runtime-docker-config',
+                'mkdir -p "$${DOCKER_CONFIG}"',
+                'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
+                "printf '{\"auths\":{\"%s\":{\"auth\":\"%%s\"}}}\\n' \"$${AUTH_VALUE}\" > \"$${DOCKER_CONFIG}/config.json\"" % ARTIFACTORY_REGISTRY,
+                'RUNTIME_SMOKE_START=$(date +%s)',
+                'mvn -pl cmd-adaptor-sns-integration-tests -am verify -Pci-built-image-runtime-smoke -Dsns.runtime.image=docker-compose-command-adaptor:latest',
+                'RUNTIME_SMOKE_DURATION=$(($(date +%s)-RUNTIME_SMOKE_START))',
+                'echo "CI_TIMING name=built_image_runtime_smoke duration_seconds=$${RUNTIME_SMOKE_DURATION}"'
+            ],
+            'environment': {
+                'DOCKER_HOST': 'tcp://docker:2375',
+                'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
+                'TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX': 'docker.digital.homeoffice.gov.uk/',
+                'TESTCONTAINERS_RYUK_DISABLED': 'true'
+            },
+            'depends_on': [
+                'Build Command Adaptor Image'
+            ]
+        }
+    )
+
     # Sonar: HO setup only allows for a single branch to be ingested
     # as such only target the main developer branch develop (Gitflow) or master/main (Trunk)
     response = add_pipeline_step(
@@ -272,7 +300,7 @@ def ci_pipeline(ctx):
         {
             'name': 'Scan with Trivy',
             'depends_on': [
-                'Build Command Adaptor Image'
+                'Validate Built Image Runtime'
             ],
             'commands': [
                 # PM-75944: updated application to use ecr trivy db

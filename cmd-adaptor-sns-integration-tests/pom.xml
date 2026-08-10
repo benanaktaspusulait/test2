@@ -20,6 +20,7 @@
         <sns.testcontainers.skip-if-docker-unavailable>true</sns.testcontainers.skip-if-docker-unavailable>
         <sns.testcontainers.aggregators.enabled>false</sns.testcontainers.aggregators.enabled>
         <sns.testcontainers.expected-scenarios>0</sns.testcontainers.expected-scenarios>
+        <failsafe.includes>**/*IntegrationTest</failsafe.includes>
         <failsafe.excludes>none</failsafe.excludes>
         <cucumber.filter.tags/>
     </properties>
@@ -174,6 +175,22 @@
                 <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
                 <sns.testcontainers.aggregators.enabled>true</sns.testcontainers.aggregators.enabled>
                 <sns.testcontainers.expected-scenarios>14</sns.testcontainers.expected-scenarios>
+                <failsafe.excludes>none</failsafe.excludes>
+            </properties>
+        </profile>
+        <profile>
+            <!-- CI runtime smoke: validate the freshly built adaptor image can boot and become ready -->
+            <id>ci-built-image-runtime-smoke</id>
+            <properties>
+                <skip.containers>true</skip.containers>
+                <skip.aggregators>true</skip.aggregators>
+                <skip.integration.tests>false</skip.integration.tests>
+                <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
+                <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
+                <sns.testcontainers.skip-if-docker-unavailable>false</sns.testcontainers.skip-if-docker-unavailable>
+                <sns.testcontainers.aggregators.enabled>false</sns.testcontainers.aggregators.enabled>
+                <sns.testcontainers.expected-scenarios>0</sns.testcontainers.expected-scenarios>
+                <failsafe.includes>**/BuiltImageRuntimeIntegrationTest</failsafe.includes>
                 <failsafe.excludes>none</failsafe.excludes>
             </properties>
         </profile>
@@ -356,7 +373,7 @@
                                 <exclude>${failsafe.excludes}</exclude>
                             </excludes>
                             <includes>
-                                <include>**/*IntegrationTest</include>
+                                <include>${failsafe.includes}</include>
                             </includes>
                             <skip>${skip.integration.tests}</skip>
                         </configuration>

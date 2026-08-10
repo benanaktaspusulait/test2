@@ -365,6 +365,22 @@ public final class SnsTestcontainersEnvironment {
         return RUN_ID;
     }
 
+    static Network sharedNetwork() {
+        return NETWORK;
+    }
+
+    static String kafkaInternalBootstrapServers() {
+        return KAFKA_ALIAS + ":29092";
+    }
+
+    static String schemaRegistryInternalUrl() {
+        return "http://" + SCHEMA_REGISTRY_ALIAS + ":8081";
+    }
+
+    static String redisInternalHost() {
+        return REDIS_ALIAS;
+    }
+
     public static String getApplicationHost() {
         startApplication();
         if (applicationContext != null) {
