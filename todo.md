@@ -1,770 +1,513 @@
-Evet. Test-count parity temiz çıktı: **14 eski gerçek senaryo → 14 yeni gerçek senaryo, 0 skipped**. Şimdi kalan asıl soru artık test sayısı değil:
+Evet, **şimdi gerçek eksik ortaya çıkmış**. Bu audit bence tam ihtiyacımız olan şeyi yakalamış.
 
-> **Eski pipeline’daki her teknik sorumluluk yeni pipeline’da gerçekten karşılanıyor mu, yoksa bazı stage’ler sadece kaldırılmış mı?**
+İyi tarafı şu: esas integration davranışı korunmuş görünüyor:
 
-Aşağıdaki prompt tam bunun için. Bu aşamada **kod değiştirmesin**; önce eksik fonksiyonu net bulsun. Özellikle `Aggregators`, `Pre-Integration Tests`, eski `Command Adaptor`, Compose infrastructure ve yeni Testcontainers uygulama startup yoluna odaklanıyor.
+* Kafka + Redis + Schema Registry → Testcontainers ile karşılanıyor ✅
+* Aggregators → gerçek aggregate container'larıyla karşılanıyor ✅
+* Pre-integration hazırlıkları → shared fixture içine taşınmış ✅
+* 14 gerçek SNS scenario → 14'ü de çalışıyor ✅
+* `skipped = 0` ✅
+* gerçek `cmd-adaptor-sns` processing → çalışıyor ✅
+* dynamic Testcontainers endpoints → kullanılıyor ✅
+* Avro / Schema Registry → korunuyor ✅
+* Trivy → aynı image'ı scan ediyor ✅
+* failure gates → zayıflatılmamış ✅
+
+**Tek FAIL şu:**
+
+> Freshly built `docker-compose-command-adaptor:latest` image artık CI'da gerçekten çalıştırılmıyor ve readiness kontrolü yapılmıyor.
+
+Eski CI:
 
 ```text
-Perform a FINAL CI FUNCTIONAL PARITY AUDIT between the original develop
-pipeline and the current Testcontainers-based feature-branch pipeline.
+build Docker image
+      ↓
+docker-compose up command-adaptor
+      ↓
+gerçek container çalışıyor
+      ↓
+readiness
+      ↓
+integration tests
+```
 
-IMPORTANT:
+Yeni CI:
 
-The test discovery / scenario parity audit has already been completed.
+```text
+Maven JVM içinde gerçek CmdAdaptorApplication
+      ↓
+14 integration scenario
+      ↓
+PASS
 
-Known result:
+sonra
 
-- develop real cmd-adaptor-sns integration scenarios: 14
-- current Testcontainers real cmd-adaptor-sns integration scenarios: 14
-- failures: 0
-- errors: 0
-- skipped: 0
+Docker image build
+      ↓
+docker inspect
+      ↓
+Trivy
+```
 
-Do NOT repeat the full test-count audit.
+Yani şu anda test ettiğimiz:
 
-This audit has a different purpose:
+```text
+application code works       ✅
+integration behaviour works  ✅
+Docker image builds          ✅
+Docker image scans           ✅
 
-Determine whether every IMPORTANT FUNCTIONAL RESPONSIBILITY of the old CI
-pipeline is still performed by the new pipeline, even though the old stages no
-longer exist separately.
+Docker image actually boots  ❌
+```
 
-Do not modify any files yet.
+Bu küçük ama **gerçek bir coverage gap**.
+
+### Bence çözüm
+
+Eski 20 dakikalık Compose yolunu geri getirmemeliyiz.
+
+Sadece image build'den sonra çok dar bir:
+
+```text
+Validate Built Image Runtime
+```
+
+step'i eklenmeli.
+
+Akış:
+
+```text
+Build and Test with Testcontainers       ~1:12
+             ↓
+Build Command Adaptor Image              ~0:20
+             ↓
+Validate Built Image Runtime             ~?? 20-60 sec
+             ↓
+Trivy                                    ~0:44
+```
+
+Bu step:
+
+1. **az önce build edilen local image'ı** kullanmalı,
+2. gerekli minimum Kafka/Redis/Schema Registry altyapısını Testcontainers ile açmalı,
+3. `cmd-adaptor-sns`'i bu kez **Docker image olarak** başlatmalı,
+4. production entrypoint ile boot ettiğini doğrulamalı,
+5. readiness/health kontrolü yapmalı,
+6. sonra container'ları kapatmalı.
+
+**14 scenario'yu tekrar Docker image üzerinde çalıştırmaya gerek yok.** Onları zaten JVM/Testcontainers path doğruluyor. Buradaki amaç sadece packaging/runtime boundary:
+
+```text
+JAR
+ + Dockerfile
+ + image
+ + envconsul
+ + runtime user
+ + command
+ + configuration
+ = gerçekten boot ediyor mu?
+```
+
+Böylece duplicate 14-test execution yapmadan eski CI'ın kaybolan son sorumluluğunu geri kazanırsın.
+
+Copilot'a bunu ver:
+
+```text
+Fix the single remaining CI functional-parity gap identified by the completed
+audit.
+
+This is a CODE/PIPELINE FIX task.
+
 Do not create documentation.
-Do not create markdown reports.
+Do not create reports.
 Do not create another TODO.
-
-Use actual repository code, pipeline definitions, Maven configuration and
-develop-vs-feature-branch comparison.
-
-Do not infer equivalence from stage names.
-
-============================================================
-1. ESTABLISH THE TWO PIPELINE MODELS
-============================================================
-
-Inspect the pipeline definition on:
-
-A. origin/develop
-B. current feature branch
-
-Determine the exact old develop pipeline sequence and the exact current pipeline
-sequence.
-
-The old pipeline previously contained responsibilities/stages similar to:
-
-- RepoSync Version
-- Retrieve Artifactory Secrets
-- Wait for Docker
-- Extract Adaptor Information
-- Kafka & Redis
-- Aggregators
-- mvn clean install
-- Command Adaptor
-- Pre-Integration Tests
-- Testcontainers Smoke Tests
-- Integration Tests
-- Trivy
-
-The current pipeline visibly contains approximately:
-
-- RepoSync Version
-- Retrieve Artifactory Secrets
-- Wait for Docker
-- Extract Adaptor Information
-- Build and Test with Testcontainers
-- Build Command Adaptor Image
-- Scan with Trivy
-
-Do not rely on this list alone.
-
-Read the actual pipeline source and determine exact commands.
-
-============================================================
-2. BUILD A FUNCTIONAL RESPONSIBILITY MAP
-============================================================
-
-For every OLD stage, determine what technical responsibility it performed.
-
-Do not simply say:
-
-"removed"
-or
-"replaced by Testcontainers".
-
-Trace what the old stage actually did.
-
-For every old stage classify it as exactly one:
-
-- UNCHANGED
-- MERGED INTO CURRENT STEP
-- REPLACED BY TESTCONTAINERS
-- REPLACED BY MAVEN/TEST FIXTURE
-- NO LONGER REQUIRED — PROVEN
-- STILL REQUIRED BUT MISSING
-- UNKNOWN
-
-For MERGED / REPLACED classifications, identify the exact current code or command
-that now performs the responsibility.
-
-============================================================
-3. KAFKA & REDIS OLD STAGE
-============================================================
-
-Inspect the original "Kafka & Redis" stage.
-
-Determine exactly what it started/configured.
-
-Check:
-
-- Kafka image/version
-- Redis image/version
-- listeners
-- ports
-- topics
-- readiness
-- volumes
-- environment variables
-- Schema Registry relationship, if any
-- any initialization scripts
-
-Then inspect the current Testcontainers implementation.
-
-Verify that every Kafka/Redis capability required by the 14 application
-scenarios is now supplied through Testcontainers.
-
-Prove that the current integration tests do NOT depend on the old Compose
-Kafka/Redis instances.
-
-Check effective runtime configuration of cmd-adaptor-sns.
-
-Specifically verify that during the Testcontainers CI path the application uses:
-
-- dynamically resolved Kafka bootstrap servers
-- dynamically resolved Redis host/port
-- Testcontainers-provided Schema Registry URL where applicable
-
-Look for hidden fallbacks to:
-
-- localhost fixed ports
-- docker-compose hostnames
-- kafka:9092
-- redis:6379
-- environment-specific defaults
-
-If such fallback exists, classify as a regression.
-
-============================================================
-4. AGGREGATORS OLD STAGE — HIGH PRIORITY
-============================================================
-
-This is one of the most important checks.
-
-Inspect exactly what the old "Aggregators" stage did.
-
-Determine:
-
-- which services/processes it started
-- which image/JAR/module it used
-- what Kafka topics it consumed
-- what Kafka topics it produced
-- whether it transformed/aggregated data needed by IntegrationTest
-- whether the 14 existing scenarios depended on its outputs
-- whether it populated Redis or any other state
-- whether it was just infrastructure or actual business-flow processing
-
-Then trace the current Testcontainers tests.
-
-For each old Aggregator responsibility, determine whether it is now:
-
-A. executed in-process by the test/application
-B. represented by an existing repository stub/test double
-C. no longer required because the tested boundary changed
-D. still required but missing
-
-Do NOT accept:
-
-"Tests pass without it"
-
-as proof that Aggregators are no longer required.
-
-Prove WHY they are no longer required or WHERE their responsibility moved.
-
-Check whether assertions were changed in a way that simply avoids needing
-Aggregator output.
-
-Compare relevant integration assertions against develop.
-
-If Aggregators previously represented a real part of the 14 scenarios and that
-behaviour is now missing rather than replaced, classify:
-
-    STILL REQUIRED BUT MISSING
-
-============================================================
-5. OLD MAVEN CLEAN INSTALL STAGE
-============================================================
-
-Inspect the old:
-
-    mvn clean install
-
-command and reactor scope.
-
-Compare with the current:
-
-    mvn clean verify -Pci-testcontainers-snapshot
-
-or actual current command.
-
-Determine:
-
-- modules built before
-- modules built now
-- test phases executed before
-- test phases executed now
-- install vs verify implications
-- whether downstream stages previously relied on artifacts installed into the
-  local Maven repository
-- whether the new image build still receives the required application JAR
-- whether generated artifacts are equivalent
-
-Verify that removal of `install` does not accidentally omit something needed by:
-
-- image build
-- integration test module
-- generated schemas/classes
-- downstream modules
-
-If `verify` is sufficient, prove why from the reactor and artifact usage.
-
-============================================================
-6. OLD COMMAND ADAPTOR STAGE
-============================================================
-
-Inspect exactly what the old "Command Adaptor" stage did.
-
-Important:
-
-Do not use the displayed duration as Docker build duration.
-
-Determine separately whether the old stage:
-
-- built the image
-- started cmd-adaptor-sns as a Docker container
-- supplied configuration
-- mounted files
-- waited for readiness
-- kept the application running during Integration Tests
-- performed health checks
-- exposed ports
-- depended on Compose infrastructure
-
-Then inspect the new Testcontainers integration path.
-
-Determine how real cmd-adaptor-sns application behaviour is now executed.
-
-Possible legitimate replacements include:
-
-- Spring application context started directly by Maven tests
-- application component instantiated inside the integration-test JVM
-- another repository-standard test bootstrap
-
-Verify that the new tests are exercising REAL application processing and not only:
-
-- test helper logic
-- a mocked service
-- Kafka produce/consume smoke behaviour
-
-Trace at least one representative real scenario end to end:
-
-    test input
-        ->
-    Kafka input
-        ->
-    real cmd-adaptor-sns processing
-        ->
-    output/state
-        ->
-    existing business assertion
-
-Identify the exact production classes participating.
-
-If the old containerized Command Adaptor has been removed from the integration
-path, prove that the real application is now executed through an equivalent
-test bootstrap.
-
-============================================================
-7. PRE-INTEGRATION TESTS OLD STAGE — HIGH PRIORITY
-============================================================
-
-Inspect the exact old "Pre-Integration Tests" implementation.
-
-Determine what it did before the integration suite.
-
-Look for responsibilities such as:
-
-- topic creation
-- schema creation
-- schema registration
-- Kafka configuration
-- Redis initialization
-- test-data initialization
-- configuration generation
-- environment validation
-- readiness waiting
-- application health checking
-- artifact copying
-- certificate setup
-- template/resource preparation
-
-For every responsibility, find the equivalent current Testcontainers
-implementation.
-
-Classify every old responsibility as:
-
-- handled by shared Testcontainers fixture
-- handled by Maven/test setup
-- unnecessary with concrete technical reason
-- MISSING
-
-Do not assume container startup replaces all initialization.
-
-============================================================
-8. OLD TESTCONTAINERS SMOKE TESTS
-============================================================
-
-The old pipeline previously had a narrow:
-
-    Testcontainers Smoke Tests
-
-stage.
-
-The current parity analysis showed:
-
-- MinimalRedisTest is present but filtered
-- KafkaSchemaRegistrySmokeTest is present but filtered
-- smoke test count in current CI = 0
-- real SNS application scenarios = 14
-
-Determine whether excluding the standalone smoke tests is correct.
-
-Check whether the 14 real integration scenarios already exercise:
-
-- Redis startup/use
-- Kafka startup/use
-- Schema Registry startup/use
-- actual schema serialization/deserialization
-
-If the same infrastructure failure would cause the real integration suite to
-fail, then standalone smoke tests may legitimately be redundant in CI.
-
-If important infrastructure behaviour is ONLY covered by the filtered smoke
-tests and not the real suite, flag it.
-
-Do not require duplicate smoke tests merely for test-count symmetry.
-
-============================================================
-9. OLD INTEGRATION TESTS STAGE
-============================================================
-
-Inspect the old exact Integration Tests Maven command.
-
-Compare it with the current Testcontainers Maven command.
-
-Confirm that:
-
-- the same 14 relevant Cucumber/application scenarios are executed
-- feature files are still the same where applicable
-- step definitions remain meaningful
-- test data is equivalent
-- tags have not narrowed business coverage
-- failure scenarios still execute
-- assertions have not been weakened
-
-The previous parity audit already found 14 vs 14.
-
-This step should focus on BEHAVIOURAL equivalence, not recounting tests.
-
-============================================================
-10. TOPIC TEMPLATE / RESOURCE PREPARATION
-============================================================
-
-Inspect any topic-template/resource restoration or preparation that historically
-happened before integration execution.
-
-The current branch appears to have had changes around topic-template resources.
-
-Verify:
-
-- required topic templates still exist
-- required resources are copied/generated
-- current Testcontainers fixture uses the same semantically required topic
-  definitions
-- no resource was accidentally deleted during pilot cleanup
-- no required file is now being silently replaced with a simplified hard-coded
-  equivalent
-
-If templates are no longer required, prove which code replaced their behaviour.
-
-============================================================
-11. SCHEMA REGISTRY FUNCTIONAL PARITY
-============================================================
-
-Compare old and new Schema Registry behaviour.
-
-Determine:
-
-- how Schema Registry was supplied previously
-- what subjects/schemas were used
-- how schemas were registered
-- how application serializers/deserializers resolved them
-- whether compatibility settings mattered
-
-Verify the new Testcontainers path provides equivalent functionality.
-
-Do not count a successful standalone register/retrieve smoke operation as enough.
-
-The real application scenarios must use the Testcontainers Schema Registry where
-schema-backed messages are involved.
-
-============================================================
-12. APPLICATION CONFIGURATION PARITY
-============================================================
-
-Compare effective configuration between old Compose integration execution and
-new Testcontainers integration execution.
-
-Focus only on configuration relevant to tested behaviour.
-
-Check:
-
-- Kafka endpoints
-- Redis endpoints
-- Schema Registry
-- topic names
-- application ID
-- consumer group
-- serialization
-- retry configuration
-- polling
-- command/output topics
-- required feature flags
-
-Identify any branch change that changes BUSINESS behaviour rather than merely
-redirecting infrastructure endpoints.
-
-Infrastructure migration should not silently alter application semantics.
-
-============================================================
-13. EXTERNAL SERVICES / MOCKS / STUBS
-============================================================
-
-Determine whether any old integration scenario depended on services other than:
-
-- Redis
-- Kafka
-- Schema Registry
-- cmd-adaptor-sns
-
-If yes:
-
-- identify each service
-- determine how it was provided on develop
-- determine how it is provided now
-
-Look especially for old Compose services such as Aggregators or other helper
-services.
-
-If replaced by mocks/stubs:
-
-- check whether those mocks/stubs already existed on develop
-- check whether the replacement changes the integration boundary
-
-Flag newly introduced mocks that substantially reduce real integration coverage.
-
-============================================================
-14. PIPELINE ORDERING / DEPENDENCY PARITY
-============================================================
-
-Verify the new ordering is technically valid.
-
-Current shape appears approximately:
-
-    Build and Test with Testcontainers
-        ->
-    Build Command Adaptor Image
-        ->
-    Trivy
-
-Check whether any test previously validated the BUILT Docker image itself.
-
-If the old integration tests actually executed the Docker image produced by the
-pipeline, but the new tests execute application classes BEFORE the image is
-built, explicitly state this architectural difference.
-
-Determine whether this matters for acceptance.
-
-Distinguish:
-
-A. application integration correctness
-B. container image runtime correctness
-
-Verify that Story 1 image smoke/runtime validation still provides coverage for B.
-
-Do not conflate Maven application tests with Docker image validation.
-
-============================================================
-15. BUILD COMMAND ADAPTOR IMAGE STAGE
-============================================================
-
-Inspect the current image-build stage.
-
-Verify it still produces the expected:
+Do not redesign the existing Testcontainers migration.
+Do not restore the old Docker Compose integration pipeline.
+
+The audit established that:
+
+- all 14 real SNS integration scenarios are preserved
+- skipped = 0
+- Kafka/Redis/Schema Registry responsibilities are preserved
+- Aggregator responsibilities are preserved
+- pre-integration responsibilities are preserved
+- real cmd-adaptor-sns processing is exercised
+- Testcontainers dynamic endpoints are used
+- Schema Registry/Avro behaviour is preserved
+- Trivy still scans the intended image
+- failure gates remain intact
+
+The ONLY identified functional gap is:
+
+The freshly built:
 
     docker-compose-command-adaptor:latest
 
-or actual required image.
+image is built and inspected, but is no longer actually started and
+readiness-validated in CI.
 
-Check:
+Old develop CI exercised the freshly built command-adaptor Docker container.
+The new pipeline currently exercises CmdAdaptorApplication in-process during
+the Testcontainers suite and builds the Docker image afterwards.
 
-- JAR source
-- required OTel JAR
+Close ONLY this gap.
+
+============================================================
+TARGET PIPELINE
+============================================================
+
+Keep the current efficient structure:
+
+    Build and Test with Testcontainers
+                |
+                v
+    Build Command Adaptor Image
+                |
+                v
+    Validate Built Image Runtime
+                |
+                v
+    Scan with Trivy
+
+Do NOT restore:
+
+- old Kafka & Redis Compose stage
+- old Aggregators Compose stage
+- old Command Adaptor Compose execution
+- old Pre-Integration Tests stage
+- old Integration Tests Compose stage
+
+The 14 business scenarios must continue to execute only once through the
+existing Testcontainers integration path.
+
+============================================================
+1. REUSE THE FRESHLY BUILT IMAGE
+============================================================
+
+The runtime validation MUST exercise the exact local Docker image produced by
+the immediately preceding image-build step.
+
+Expected image name is currently:
+
+    docker-compose-command-adaptor:latest
+
+Verify the actual pipeline value before changing anything.
+
+Do not rebuild the image during runtime validation.
+
+Do not substitute a registry image.
+
+Do not validate an image left over from another build.
+
+Ensure the image exists locally before starting it.
+
+============================================================
+2. START THE IMAGE AS A REAL CONTAINER
+============================================================
+
+The validation must start cmd-adaptor-sns from the Docker image itself.
+
+It must NOT start:
+
+    CmdAdaptorApplication
+
+directly inside the Maven/JUnit JVM as the SUT for this check.
+
+The purpose is specifically to validate the Docker packaging/runtime boundary.
+
+Use the production-equivalent image:
+
+- Dockerfile
+- ENTRYPOINT/CMD
 - runtime user
-- command
-- envconsul
-- expected image configuration
+- envconsul behaviour where applicable
+- Java runtime
+- required application JAR
+- OpenTelemetry JAR/configuration where applicable
 
-Verify the Testcontainers pipeline restructuring did not accidentally stop
-building the production-equivalent command-adaptor image.
-
-============================================================
-16. BUILD CACHE IS NOT HIDING MISSING WORK
-============================================================
-
-Because the current image build is around ~20 seconds, verify from BuildKit
-output that the speed is from valid cache reuse.
-
-Look for evidence such as:
-
-- setup layers CACHED
-- application JAR layer rebuilt when appropriate
-- image export completed
-- image inspect succeeded
-
-Do not interpret a skipped Docker build or stale pre-existing image as cache
-success.
-
-Verify the resulting image was actually produced by the current pipeline run.
+Do not override the production command with an artificial test command unless
+absolutely required for safe configuration.
 
 ============================================================
-17. TRIVY PARITY
+3. PROVIDE ONLY THE MINIMUM REQUIRED DEPENDENCIES
 ============================================================
 
-Compare old and new Trivy execution.
+Determine exactly which dependencies cmd-adaptor-sns requires in order to boot
+and become ready.
 
-Verify:
+Reuse the existing maintained Testcontainers infrastructure where practical.
 
-- the same intended image/artifact is scanned
-- vulnerability scanning is not now scanning an older cached image
-- scan failure behaviour remains equivalent
-- no required scan was removed during pipeline simplification
-
-Do not perform vulnerability analysis; only check pipeline responsibility parity.
-
-============================================================
-18. FAILURE BEHAVIOUR
-============================================================
-
-Compare failure semantics.
-
-Old pipeline should fail when important infrastructure/application checks fail.
-
-Verify current pipeline fails when:
-
-- Testcontainers cannot start
-- Kafka unavailable
-- Redis unavailable
-- Schema Registry unavailable
-- application cannot start
-- real integration scenario fails
-- Maven build fails
-- image build fails
-- Trivy gate fails where configured
-
-Look for:
-
-    || true
-    set +e
-    swallowed exit codes
-    continue-on-error equivalents
-    shell constructs masking failure
-
-Flag any newly weakened failure gate.
-
-============================================================
-19. TESTCONTAINERS DEPENDENCE ON EARLIER PIPELINE SERVICES
-============================================================
-
-This is a critical check.
-
-Verify the Testcontainers step is self-contained with respect to:
+Likely dependencies include:
 
 - Redis
 - Kafka
 - Schema Registry
 
-It must not succeed only because some earlier pipeline stage has already started
-those services.
+Do not bring back the full Docker Compose environment.
 
-Given the new pipeline no longer visibly has separate Kafka & Redis stages, this
-should be easier to prove.
+Do not start unrelated services.
 
-Search for static connection defaults and environment leakage.
+Do not start Aggregators unless the command-adaptor process genuinely requires
+them simply to become ready.
 
-============================================================
-20. CLEAN ENVIRONMENT ASSUMPTION
-============================================================
-
-Reason from pipeline configuration whether the Testcontainers stage would pass on
-a fresh CI worker with:
-
-- Docker available
-- repository cloned
-- required credentials available
-- NO pre-existing Kafka
-- NO pre-existing Redis
-- NO pre-existing Schema Registry
-- NO pre-existing command-adaptor container
-
-If not, identify the hidden dependency.
-
-Do not actually destroy infrastructure on the current machine to test this.
+This is a runtime smoke validation, not another full business-suite execution.
 
 ============================================================
-21. EXPLAIN THE PERFORMANCE DIFFERENCE
+4. NETWORKING
 ============================================================
 
-Based on actual old/new responsibilities, explain where the ~23 minute -> ~3
-minute change comes from.
+The image container and required dependency containers must communicate through
+an isolated Docker/Testcontainers network.
 
-Break it down qualitatively.
+Because cmd-adaptor-sns itself is now a container, configure it with the
+container-to-container endpoints.
 
-For example:
+Do not pass test-JVM mapped localhost ports to the SUT container where internal
+Docker aliases should be used.
 
-- removed Compose environment startup
-- Aggregator containers no longer needed / replaced
-- application runs inside Maven test context rather than long-lived Docker flow
-- Testcontainers starts only required dependencies
-- BuildKit registry cache reduces image-build cost
-- old integration waiting/readiness path removed
-- reduced orchestration overhead
+Use stable network aliases for:
 
-Do NOT invent exact savings unless directly measurable from pipeline evidence.
+- Kafka
+- Redis
+- Schema Registry
 
-Most importantly:
+as appropriate.
 
-State whether any meaningful old responsibility was lost to achieve the speedup.
+Use the repository's actual configuration property/environment names.
+
+Do not invent new production configuration names.
 
 ============================================================
-22. FINAL RESPONSIBILITY TABLE
+5. READINESS
 ============================================================
 
-Return a table in CHAT ONLY.
+Wait for actual cmd-adaptor-sns readiness.
 
-Do not create a file.
+Reuse an existing readiness mechanism where available.
 
-Use columns:
+Prefer:
 
-OLD STAGE
-OLD RESPONSIBILITY
-CURRENT REPLACEMENT
-STATUS
-EVIDENCE
+- existing health/readiness endpoint
+- existing startup log indicator
+- existing application-level readiness mechanism
 
-Required rows include at minimum:
+Use a bounded timeout.
 
-- Kafka & Redis
-- Aggregators
-- mvn clean install
-- Command Adaptor
-- Pre-Integration Tests
-- Testcontainers Smoke Tests
-- Integration Tests
-- Trivy
+Do not use a large arbitrary:
 
-STATUS must be exactly one of:
+    sleep 60
 
-- PRESERVED
-- REPLACED EQUIVALENTLY
-- LEGITIMATELY REMOVED
-- MISSING
-- UNCERTAIN
+or similar.
+
+A successful `docker start` alone is NOT sufficient.
+
+The application must remain running and reach its expected ready state.
+
+============================================================
+6. FAIL CORRECTLY
+============================================================
+
+The CI step must fail when:
+
+- the image is missing
+- the image cannot start
+- the production command fails
+- required runtime artifacts are missing
+- Kafka/Redis/Schema Registry configuration is invalid
+- the application exits unexpectedly
+- readiness is not reached within the bounded timeout
+
+Do not use:
+
+    || true
+
+or otherwise swallow the failure.
+
+============================================================
+7. FAILURE DIAGNOSTICS
+============================================================
+
+On failure, print useful runtime diagnostics to the CI console:
+
+- command-adaptor container logs
+- relevant dependency container logs where useful
+- container exit status
+
+Do not create or commit log files.
+
+Do not dump secrets.
+
+============================================================
+8. CLEANUP
+============================================================
+
+After success or failure:
+
+- stop/remove the runtime validation container
+- clean Testcontainers dependencies/network
+- do not leave CI Docker resources behind
+
+Do not enable Testcontainers reuse.
+
+============================================================
+9. DO NOT DUPLICATE THE BUSINESS SUITE
+============================================================
+
+This runtime check must NOT rerun all 14 Cucumber scenarios.
+
+The existing:
+
+    Build and Test with Testcontainers
+
+step already validates application/integration behaviour.
+
+This new validation only needs to prove:
+
+    freshly built Docker image
+           +
+    production runtime configuration
+           +
+    real process startup
+           +
+    readiness
+           =
+    valid runnable image
+
+A narrow runtime smoke test is sufficient.
+
+============================================================
+10. PRESERVE PERFORMANCE
+============================================================
+
+The implementation should remain lightweight.
+
+Do not recreate the old ~20-minute Compose orchestration.
+
+The expected additional cost should be limited to the time required to start the
+minimal dependency stack and command-adaptor image and verify readiness.
+
+Do not sacrifice correctness for a timing target, but avoid unnecessary services
+and duplicate test execution.
+
+============================================================
+11. DO NOT TOUCH STORY 1 IMPLEMENTATION
+============================================================
+
+Preserve the existing approved image-build optimisation:
+
+- Dockerfile layer ordering
+- .dockerignore
+- default BuildKit builder
+- registry cache
+- feature-branch cache
+- develop shared-cache policy
+
+The runtime validation consumes the image produced by that implementation.
+
+Do not redesign the image build.
+
+============================================================
+12. TRIVY ORDER
+============================================================
+
+The preferred order is:
+
+    build image
+        ->
+    runtime validation
+        ->
+    Trivy
+
+This ensures the same freshly built image is:
+
+1. successfully built
+2. successfully executed
+3. readiness validated
+4. scanned
+
+Do not scan a different image reference.
+
+============================================================
+13. VALIDATE THE FIX
+============================================================
+
+Run the repository-owned validation possible locally.
+
+Then ensure the CI pipeline invokes the new runtime validation step.
+
+After implementation verify:
+
+- 14 existing Testcontainers business scenarios still execute
+- no scenario is newly skipped
+- image build succeeds
+- freshly built image starts
+- readiness succeeds
+- runtime smoke exits successfully
+- Trivy still scans the same image
+- no old Compose integration stages were restored
+
+============================================================
+14. KEEP THE DIFF MINIMAL
+============================================================
+
+Prefer reusing existing:
+
+- SnsTestcontainersEnvironment
+- network setup
+- configuration values
+- readiness mechanisms
+- test utility code
+
+But do not introduce awkward coupling merely to reuse code.
+
+A small dedicated built-image runtime smoke test/helper is acceptable.
+
+Do not build a generic Docker testing framework.
+
+Remove any temporary implementation created while solving this.
+
+============================================================
+FINAL EXPECTED RESULT
+============================================================
+
+The functional responsibility map should become:
+
+Kafka & Redis             REPLACED EQUIVALENTLY
+Aggregators               REPLACED EQUIVALENTLY
+mvn clean install         REPLACED EQUIVALENTLY
+Command Adaptor app tests REPLACED EQUIVALENTLY
+Pre-Integration Tests     REPLACED EQUIVALENTLY
+Smoke Tests               LEGITIMATELY REMOVED
+Integration Tests         REPLACED EQUIVALENTLY
+Built Docker image runtime PRESERVED
+Trivy                     PRESERVED
+
+There must be no remaining functional gap caused by the pipeline migration.
 
 ============================================================
 FINAL RESPONSE
 ============================================================
 
+Do not create a file.
+
 Return only:
 
-## Overall Verdict
-
-Choose exactly one:
-
-- FULL FUNCTIONAL PARITY
-- FUNCTIONAL PARITY WITH EXPLAINED ARCHITECTURAL CHANGES
-- FUNCTIONAL GAP FOUND
-
-## Old-to-New Responsibility Map
-
-Provide the requested table.
-
-## High-Risk Checks
-
-State PASS / FAIL / UNCERTAIN for:
-
-- Aggregator responsibility preserved
-- Pre-Integration responsibility preserved
-- real cmd-adaptor-sns processing exercised
-- real 14 business scenarios preserved
-- application uses Testcontainers endpoints
-- no hidden Compose dependency
-- Schema Registry/Avro behaviour preserved
-- Docker image still built and runtime-valid
-- Trivy still scans the intended image
-- failure gates are not weakened
-
-## Architectural Differences
-
-List only meaningful differences between old and new execution models.
-
-## Missing Functionality
-
-List only functionality that existed on develop and has no valid replacement.
-
-Write:
-
-    None
-
-if none exists.
-
-## Performance Conclusion
-
-In no more than 5 sentences:
-
-Explain whether the approximately 23-minute to 3-minute improvement is
-technically credible based on the responsibility comparison.
-
-Explicitly state whether the speedup appears to come from orchestration
-simplification/optimisation or from lost functional coverage.
-
-DO NOT MODIFY ANY FILE.
-DO NOT CREATE DOCUMENTATION.
-DO NOT CREATE A TODO.
+- files changed
+- runtime-validation mechanism used
+- exact image validated
+- readiness mechanism used
+- local validation result
+- CI pipeline step added/changed
+- whether the 14 business scenarios remain unchanged
+- remaining functional gap: YES/NO
 ```
 
-Bu kontrol temiz çıkarsa artık üç ayrı şeyi kanıtlamış olacağız:
+Bu düzeltmeden sonra ben **23 → 3 dakika kıyasını çok daha güvenilir** görürüm.
 
-1. **Scenario parity:** `14 → 14`, skip yok.
-2. **Functional responsibility parity:** eski stage’lerin yaptığı gerekli işler yeni yapıda karşılanıyor.
-3. **Pipeline integrity:** Docker image build + Trivy + gerçek application processing hâlâ var.
+Çünkü o zaman:
 
-Özellikle `Aggregators`, `Pre-Integration Tests` ve **“eski testler Docker container içindeki uygulamayı çalıştırıyordu, yeniler JVM içindeki application context’i mi çalıştırıyor?”** kısmını atlamamak lazım. Sonuncusu önemli; test coverage aynı olsa bile execution boundary değişmiş olabilir. Bu değişiklik yanlış olmak zorunda değil, ama bilinçli ve yeterli coverage ile desteklenmiş olması gerekiyor.
+> “Testleri azaltmadık, eski fonksiyonları kaybetmedik, gerçek Docker image'ı da hâlâ çalıştırıyoruz; sadece Compose orchestration'ı ortadan kaldırdık.”
+
+diyebilirsin.
+
+Pipeline muhtemelen tam 2:56 kalmaz; örneğin 3:20–4:00 civarına çıkması şaşırtıcı olmaz. Ama bu hâlâ eski ~23 dakikaya göre çok büyük ve çok daha savunulabilir bir iyileşme.
