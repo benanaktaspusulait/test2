@@ -1,8 +1,0 @@
-.idea/*
-target
-.DS_Store
-*.iml
-.m2
-.vscode
-.drone.yml
-temp
