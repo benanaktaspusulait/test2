@@ -1,62 +1,329 @@
-# Testcontainers Pipeline Optimizasyonu — TODO
+Evet, bunu **sadece test discovery/parity kontrolü** için hedefli bir promptla kontrol ettirelim. Kod değiştirmesin; önce hangi testlerin gerçekten çalıştığını ve develop’a göre neyin kaybolduğunu net çıkarsın.
 
-Amaç: Entegrasyon testlerini Testcontainers ile çalıştırmak, Docker Compose tabanlı test yolunu kaldırmak ve CI pipeline süresini ölçülebilir şekilde kısaltmak.
+```text
+Perform a TEST DISCOVERY AND PARITY AUDIT for the current cmd-adaptor-sns branch.
 
-## P0 — Test kapsamını Testcontainers'a taşı
+Do not modify any files.
+Do not create documentation.
+Do not create reports in the repository.
+Do not create another TODO.
 
-- [x] `ci-testcontainers-cmd` profilini gerekli command-path senaryolarının tamamını çalıştıracak şekilde güncelle.
-- [x] `ci-testcontainers-snapshot` profilini mevcut integration suite'indeki gerekli senaryoların tamamını çalıştıracak şekilde güncelle.
-- [x] Kullanılmayan LocalStack bağımlılığını CI test yolundan kaldır.
-- [x] Çıktısı tüketilmeyen `aggregate-matching` bağımlılığını CI test yolundan kaldır.
-- [x] Testcontainers profillerinin beklenen feature ve scenario sayısının altına düşmesi halinde CI'ı fail eden otomatik kontrol ekle.
+The purpose of this check is to determine whether the new Testcontainers CI path
+is fast because it is genuinely more efficient, or because some existing tests
+are no longer being discovered/executed.
 
-## P0 — Testcontainers'ı Compose yolunun yerine geçir
+Use develop as the baseline.
 
-- [x] Normal CI ile ayrı Testcontainers pipeline'ının birlikte çalışmasını engelle; bir build'de yalnız bir integration-test yolu seçilsin.
-- [x] Testcontainers snapshot suite'ini branch CI için varsayılan integration-test yolu yap.
-- [x] Compose tabanlı `Kafka & Redis` adımını CI'dan kaldır.
-- [x] Compose tabanlı `Aggregators` adımını CI'dan kaldır.
-- [x] `Pre-Integration Tests` Compose startup adımını CI'dan kaldır.
-- [x] Compose tabanlı `Integration Tests` adımını CI'dan kaldır.
-- [x] Command adaptor image build'ini test startup bağımlılığı olmaktan çıkar.
-- [x] Docker image build ve Trivy taramasını Compose test altyapısından ayır.
-- [x] Publish adımlarının ihtiyaç duyduğu local/registry image tag'lerini yeni akışta üret.
+============================================================
+1. ESTABLISH THE BASELINE
+============================================================
 
-## P0 — Tek Maven build/test akışı oluştur
+Determine:
 
-- [x] Normal pipeline'daki `mvn clean install` ile ayrı Testcontainers pipeline'ındaki `mvn -am clean verify` tekrarını kaldır.
-- [x] Compile, unit test ve integration testleri tek `mvn clean verify` reactor akışında çalıştır.
-- [x] Testcontainers Maven profilini mevcut reactor üzerinde tek sefer çalıştır.
-- [x] Maven workspace ve repository cache kullanımını aynı pipeline içinde koru.
+- current branch
+- current HEAD
+- origin/develop or verified develop reference
+- merge base
 
-## P1 — Container başlangıç süresini azalt
+Use the correct merge-base comparison.
 
-- [x] `MinimalRedisTest` çalışırken gereksiz ZooKeeper, Kafka ve Schema Registry container'larının başlamasını engelle.
-- [x] Shared environment'a Redis-only ve messaging/full-snapshot lazy startup uygula.
-- [x] Redis'i Kafka bağımlılık zincirinden bağımsız başlat.
-- [x] Redis ve ZooKeeper başlangıcını `Startables.deepStart(...)` ile paralelleştir; Kafka → Schema Registry sırasını koru.
-- [x] Birbirinden bağımsız aggregate container'larını ve readiness kontrollerini paralel başlat.
-- [x] Command suite'inde aggregate başlatma; snapshot suite'inde yalnız tüketilen beş entity aggregate'ini başlat.
-- [x] Ayrı Testcontainers smoke CI adımını kaldır ve full suite'teki ikinci altyapı başlangıcını engelle.
+Do not assume that file count alone represents test coverage.
 
-## P1 — DIND ve image çekme maliyetini azalt
+============================================================
+2. IDENTIFY THE COMPLETE EXISTING TEST SUITE ON DEVELOP
+============================================================
 
-- [x] Testcontainers Docker Hub image'larını private registry/mirror üzerinden çekecek image-name substitution ekle.
-- [x] DIND image çekimlerini private registry proxy cache üzerinden geçir; adaptor image için registry-backed branch/develop cache'i koru.
-- [x] Container image pull/start işlemlerini bağımsız servis gruplarında paralelleştir.
-- [x] Disabled Ryuk kullanımında başarılı ve hatalı koşul sonunda container ve network cleanup'ını otomatikleştir.
+Inspect the develop version of the SNS integration-test module and determine the
+complete set of tests that are intended to execute.
 
-## P1 — Pipeline süresini otomatik kontrol et
+Check all relevant:
 
-- [x] CI adımlarına makine tarafından okunabilir süre ölçümü ekle.
-- [x] Testcontainers verify adımı 720 saniyeyi aşarsa CI'ı fail eden kontrol ekle.
-- [x] Toplam branch pipeline'ı 815 saniyelik Compose baseline'ı aşarsa CI'ı fail eden kontrol ekle.
-- [x] Opt-in işaretlerini ve geçici çift-pipeline desteğini kaldır.
+- test classes
+- test methods
+- base classes
+- inherited tests
+- JUnit tags
+- @Disabled / @Ignore
+- Maven profiles
+- Surefire configuration
+- Failsafe configuration
+- include/exclude patterns
+- test naming conventions
+- integration-test naming conventions
+- profile activation
+- CI Maven commands
 
-## Tamamlanma kriteri
+Determine the effective DEVELOP baseline:
 
-- [x] Varsayılan branch CI yalnız Testcontainers tabanlı integration suite'i çalıştırıyor.
-- [x] Test kapsamının 7 feature/14 scenario altına düşmesini engelleyen otomatik guard mevcut.
-- [x] Aynı build içinde ikinci Maven build'i veya ikinci integration-test pipeline'ı çalışmıyor.
-- [x] Docker Compose test altyapısı CI kritik yolundan çıkarılmış durumda.
-- [x] Docker image build, Trivy ve publish akışları render edilen pipeline'da mevcut.
+- total relevant test classes
+- total relevant test methods/scenarios
+- tests intentionally disabled on develop
+- tests excluded by design on develop
+
+Do not count unrelated unit tests.
+
+============================================================
+3. IDENTIFY WHAT THE CURRENT TESTCONTAINERS CI PATH ACTUALLY RUNS
+============================================================
+
+Inspect the current branch pipeline configuration.
+
+Find the exact stage corresponding to:
+
+    Build and Test with Testcontainers
+
+Determine the exact Maven command executed by that stage.
+
+Then determine the exact tests discovered by that command.
+
+Report:
+
+- test classes discovered
+- test methods/scenarios discovered
+- tests executed
+- tests skipped
+- tests disabled
+- tests excluded
+- tests filtered out by tag/profile/include/exclude rules
+
+Do not infer from the stage name.
+
+Use the actual Maven/JUnit configuration.
+
+============================================================
+4. COMPARE DEVELOP VS CURRENT BRANCH
+============================================================
+
+Create an in-memory comparison of:
+
+A. tests executed on develop/default integration path
+B. tests executed on the current Testcontainers path
+
+Classify every relevant develop test as exactly one of:
+
+- EXECUTED IN TESTCONTAINERS
+- INTENTIONALLY NOT APPLICABLE
+- STILL COMPOSE-ONLY WITH CONCRETE TECHNICAL REASON
+- ACCIDENTALLY SKIPPED
+- ACCIDENTALLY EXCLUDED
+- DISABLED ON CURRENT BRANCH
+- NOT DISCOVERED
+- TEST REMOVED
+- UNKNOWN
+
+The main goal is to identify any test that existed in the develop integration
+coverage but is no longer exercised in the new Testcontainers CI path.
+
+============================================================
+5. LOOK FOR SILENT COVERAGE REDUCTION
+============================================================
+
+Specifically inspect branch changes for:
+
+- @Disabled
+- @Ignore
+- disabledWithoutDocker
+- changed @Tag values
+- removed @Tag values
+- changed Maven groups/excludedGroups
+- Surefire includes/excludes
+- Failsafe includes/excludes
+- -Dtest
+- -Dit.test
+- -Dgroups
+- -DexcludedGroups
+- test class renames
+- test method renames
+- deleted test files
+- deleted test methods
+- inherited tests no longer discovered
+- changed profile activation
+- skipped modules
+- `-pl` scope changes
+- missing `-am`
+- changed test source directories
+- changed plugin execution phases
+
+Also inspect CI shell conditions that may cause tests to be skipped.
+
+============================================================
+6. CHECK MAVEN OUTPUT
+============================================================
+
+Run or inspect the exact Testcontainers Maven command.
+
+Capture the effective Maven test summary.
+
+For every module involved, identify:
+
+    Tests run:
+    Failures:
+    Errors:
+    Skipped:
+
+Do not rely only on the final reactor BUILD SUCCESS.
+
+A green Maven build is not sufficient if intended tests were skipped.
+
+If Maven output is split across Surefire and Failsafe, combine them correctly.
+
+============================================================
+7. CHECK TEST REPORT FILES
+============================================================
+
+Inspect generated Surefire/Failsafe reports from the current run where available.
+
+Use them to determine the exact executed test classes and test methods.
+
+Do not create or commit report files.
+
+Use existing generated reports only for analysis.
+
+Check for:
+
+- skipped="true"
+- disabled tests
+- zero-test modules
+- classes with zero executed methods
+- tests filtered before execution
+
+============================================================
+8. CHECK DOCKER-SKIP BEHAVIOUR
+============================================================
+
+Pay special attention to Testcontainers patterns such as:
+
+    @Testcontainers(disabledWithoutDocker = true)
+
+Determine whether any intended CI tests can silently become skipped when Docker
+is unavailable or incorrectly detected.
+
+In the current CI run, verify Docker is actually available and intended
+Testcontainers tests are NOT skipped because of this option.
+
+============================================================
+9. CHECK APPLICATION TESTS VS SMOKE TESTS
+============================================================
+
+Separate:
+
+- Redis infrastructure smoke tests
+- Kafka infrastructure smoke tests
+- Schema Registry infrastructure smoke tests
+- real cmd-adaptor-sns application integration tests
+
+Report the count for each category.
+
+The CI path is NOT complete if only infrastructure smoke tests execute.
+
+The important number is how many real cmd-adaptor-sns integration scenarios are
+actually being exercised through Testcontainers.
+
+============================================================
+10. CHECK COMPOSE-ONLY REMAINDERS
+============================================================
+
+Identify tests still only executed through the old Compose/full-E2E path.
+
+For each one state the exact technical reason.
+
+If a test is technically suitable for the Testcontainers path but is missing
+from it, classify it as:
+
+    ACCIDENTALLY NOT MIGRATED
+
+Do not call it intentionally Compose-only without concrete evidence.
+
+============================================================
+11. VERIFY TEST COUNT DIFFERENCE IS EXPLAINABLE
+============================================================
+
+If the counts differ between develop and current Testcontainers paths, explain
+every difference.
+
+For example:
+
+    Develop relevant scenarios: 42
+    Testcontainers scenarios:    39
+
+The remaining 3 must each have a concrete classification and reason.
+
+No unexplained test-count reduction is acceptable.
+
+============================================================
+12. DO NOT FIX ANYTHING YET
+============================================================
+
+This pass is diagnostic only.
+
+Do not edit:
+
+- Java code
+- Maven files
+- pipeline files
+- Docker files
+- test configuration
+
+We first need to know whether anything has been skipped.
+
+============================================================
+FINAL RESPONSE
+============================================================
+
+Return only this concise chat output:
+
+## Verdict
+
+Choose exactly one:
+
+- FULL PARITY
+- PARTIAL PARITY — EXPLAINED
+- TEST COVERAGE LOST
+
+## Develop Baseline
+
+- relevant test classes:
+- relevant test methods/scenarios:
+- intentionally disabled/excluded:
+
+## Current Testcontainers CI
+
+- exact Maven command:
+- test classes discovered:
+- test methods/scenarios executed:
+- failures:
+- errors:
+- skipped:
+
+## Coverage Difference
+
+For every develop test not executed through Testcontainers, list:
+
+- class
+- method/scenario where relevant
+- classification
+- exact reason
+
+## Smoke vs Application Coverage
+
+- Redis smoke tests:
+- Kafka smoke tests:
+- Schema Registry smoke tests:
+- real cmd-adaptor-sns integration scenarios:
+
+## Suspicious Findings
+
+List only concrete evidence of accidental skipping/exclusion.
+
+If none:
+
+    None
+
+## Conclusion
+
+One sentence only:
+state whether the ~3 minute pipeline result appears to preserve test coverage or
+whether the speedup is partly caused by tests no longer running.
+```
+
+Bu promptun amacı çok net: **“hangi testler gerçekten çalıştı?”** sorusuna cevap vermek. Özellikle `Tests run / Skipped / class-method parity` tarafını çıkarırsa, 3 dakikalık sürenin gerçek optimizasyon mu yoksa coverage kaybı mı olduğunu hemen anlarsın.
