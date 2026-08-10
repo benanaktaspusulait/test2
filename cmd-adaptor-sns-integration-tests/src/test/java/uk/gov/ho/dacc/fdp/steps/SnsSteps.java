@@ -15,6 +15,7 @@ import io.cucumber.java.en.When;
 import io.cucumber.plugin.EventListener;
 import io.cucumber.plugin.event.EventPublisher;
 import io.cucumber.plugin.event.Status;
+import io.cucumber.plugin.event.TestCaseFinished;
 import io.cucumber.plugin.event.TestRunFinished;
 import io.cucumber.plugin.event.TestRunStarted;
 import lombok.SneakyThrows;
@@ -69,6 +70,7 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
 import static uk.gov.ho.dacc.fdp.assertions.EventAssertions.assertEventRecord;
@@ -105,6 +107,9 @@ public class SnsSteps implements EventListener {
     private static final boolean TESTCONTAINERS_ENABLED =
             Boolean.parseBoolean(System.getProperty("sns.testcontainers.enabled", "false"));
     private static final AtomicBoolean RUNTIME_INITIALIZED = new AtomicBoolean(false);
+    private static final AtomicInteger COMPLETED_SCENARIOS = new AtomicInteger();
+    private static final int EXPECTED_SCENARIOS =
+            Integer.parseInt(System.getProperty("sns.testcontainers.expected-scenarios", "0"));
     private static final String PARTY_CMD_TOPIC_PREFIX = "fdp_party_cmd_";
     private static final String PARTY_SNAPSHOT_TOPIC_PREFIX = "fdp_party_snapshot_";
     private static final String OBJECT_CMD_TOPIC_PREFIX = "fdp_object_cmd_";
@@ -251,6 +256,8 @@ public class SnsSteps implements EventListener {
 
     @Override
     public void setEventPublisher(EventPublisher eventPublisher) {
+        eventPublisher.registerHandlerFor(TestCaseFinished.class,
+                event -> COMPLETED_SCENARIOS.incrementAndGet());
         eventPublisher.registerHandlerFor(TestRunStarted.class, event -> {
             ensureRuntimeInitialized();
             final String bootstrapServer =
@@ -333,6 +340,10 @@ public class SnsSteps implements EventListener {
 
             if (TESTCONTAINERS_ENABLED) {
                 SnsTestcontainersEnvironment.shutdown();
+            }
+            if (TESTCONTAINERS_ENABLED && COMPLETED_SCENARIOS.get() < EXPECTED_SCENARIOS) {
+                throw new IllegalStateException("Testcontainers suite executed " + COMPLETED_SCENARIOS.get()
+                        + " scenarios; expected at least " + EXPECTED_SCENARIOS);
             }
         });
     }

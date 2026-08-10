@@ -9,6 +9,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.DockerImageName;
 import uk.gov.ho.dacc.fdp.CmdAdaptorApplication;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 public final class SnsTestcontainersEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(SnsTestcontainersEnvironment.class);
@@ -101,7 +103,8 @@ public final class SnsTestcontainersEnvironment {
             "service", 7105, 8105, 9015, "service-aggregate");
 
 
-    private static volatile boolean infrastructureStarted = false;
+    private static volatile boolean redisStarted = false;
+    private static volatile boolean messagingStarted = false;
     private static volatile boolean applicationStarted = false;
     private static volatile boolean networkClosed = false;
     private static volatile RuntimeException infrastructureStartupFailure;
@@ -115,7 +118,7 @@ public final class SnsTestcontainersEnvironment {
         if (networkClosed) {
             throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
         }
-        if (infrastructureStarted) {
+        if (messagingStarted) {
             return;
         }
         if (infrastructureStartupFailure != null) {
@@ -124,18 +127,34 @@ public final class SnsTestcontainersEnvironment {
 
         LOG.info("Starting SNS Testcontainers infrastructure");
         try {
-            REDIS.start();
-            ZOOKEEPER.start();
+            Startables.deepStart(Stream.of(REDIS, ZOOKEEPER).filter(container -> !container.isRunning())).join();
+            redisStarted = true;
             KAFKA.start();
             SCHEMA_REGISTRY.start();
-            infrastructureStarted = true;
+            messagingStarted = true;
 
             createRequiredTopics();
             validateSchemaRegistryRoundTrip();
         } catch (RuntimeException e) {
-            infrastructureStarted = false;
+            messagingStarted = false;
             infrastructureStartupFailure = e;
             dumpContainerLogs("infrastructure startup failure: " + e.getMessage());
+            shutdown();
+            throw e;
+        }
+    }
+
+    public static synchronized void startRedis() {
+        assertEnvironmentOpen();
+        if (redisStarted) {
+            return;
+        }
+
+        try {
+            REDIS.start();
+            redisStarted = true;
+        } catch (RuntimeException e) {
+            dumpContainerLogs("Redis startup failure: " + e.getMessage());
             shutdown();
             throw e;
         }
@@ -238,7 +257,8 @@ public final class SnsTestcontainersEnvironment {
         if (REDIS.isRunning()) {
             REDIS.stop();
         }
-        infrastructureStarted = false;
+        messagingStarted = false;
+        redisStarted = false;
         if (applicationContext == null) {
             applicationStarted = false;
         }
@@ -282,7 +302,7 @@ public final class SnsTestcontainersEnvironment {
     }
 
     public static GenericContainer<?> redisContainer() {
-        startInfrastructure();
+        startRedis();
         return REDIS;
     }
 
@@ -333,21 +353,22 @@ public final class SnsTestcontainersEnvironment {
             return;
         }
 
-        LOG.info("Starting SNS downstream aggregate containers for snapshot scenarios");
-        startContainer(AGGREGATE_PARTY);
-        waitForAggregateReadiness(AGGREGATE_PARTY, "party");
+        LOG.info("Starting SNS downstream aggregate containers for snapshot scenarios in parallel");
+        Startables.deepStart(Stream.of(
+                AGGREGATE_PARTY,
+                AGGREGATE_OBJECT,
+                AGGREGATE_LOCATION,
+                AGGREGATE_EVENT,
+                AGGREGATE_SERVICE)).join();
 
-        startContainer(AGGREGATE_OBJECT);
-        waitForAggregateReadiness(AGGREGATE_OBJECT, "object");
-
-        startContainer(AGGREGATE_LOCATION);
-        waitForAggregateReadiness(AGGREGATE_LOCATION, "location");
-
-        startContainer(AGGREGATE_EVENT);
-        waitForAggregateReadiness(AGGREGATE_EVENT, "event");
-
-        startContainer(AGGREGATE_SERVICE);
-        waitForAggregateReadiness(AGGREGATE_SERVICE, "service");
+        Stream.of(
+                Map.entry(AGGREGATE_PARTY, "party"),
+                Map.entry(AGGREGATE_OBJECT, "object"),
+                Map.entry(AGGREGATE_LOCATION, "location"),
+                Map.entry(AGGREGATE_EVENT, "event"),
+                Map.entry(AGGREGATE_SERVICE, "service"))
+                .parallel()
+                .forEach(entry -> waitForAggregateReadiness(entry.getKey(), entry.getValue()));
     }
 
     private static void waitForAggregateReadiness(GenericContainer<?> container, String aggregateType) {
@@ -396,15 +417,15 @@ public final class SnsTestcontainersEnvironment {
         }
     }
 
-    private static void startContainer(GenericContainer<?> container) {
-        if (!container.isRunning()) {
-            container.start();
-        }
-    }
-
     private static void stopContainer(GenericContainer<?> container) {
         if (container.isRunning()) {
             container.stop();
+        }
+    }
+
+    private static void assertEnvironmentOpen() {
+        if (networkClosed) {
+            throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
         }
     }
 

@@ -1,98 +1,62 @@
-# CI/CD Optimization — Implementasyon Kontrol Listesi
+# Testcontainers Pipeline Optimizasyonu — TODO
 
-Bu liste, `/Users/benanaktas/project/home-office/ci-cd-optimization` altındaki teknik gereksinimlerin `/Users/benanaktas/project/home-office/test2` koduyla karşılaştırılmasıyla oluşturuldu. Audit `b9cc3a2` üzerinde başladı; çalışma sırasında repo HEAD'i dışarıdan `e8ee7ff` (`eksikler`) commit'ine ilerledi.
+Amaç: Entegrasyon testlerini Testcontainers ile çalıştırmak, Docker Compose tabanlı test yolunu kaldırmak ve CI pipeline süresini ölçülebilir şekilde kısaltmak.
 
-Dokümantasyon üretme/güncelleme, Confluence paylaşımı, stakeholder onayı, owner/adoption kayıtları ve yalnız gerçek dış ortamda yapılabilen kabul koşuları bu listenin kapsamı dışındadır. Repo içindeki implementasyon maddelerinin tamamı kapatılmıştır.
+## P0 — Test kapsamını Testcontainers'a taşı
 
-## P0 — Geri getirilen CI dosyalarını doğrula
+- [x] `ci-testcontainers-cmd` profilini gerekli command-path senaryolarının tamamını çalıştıracak şekilde güncelle.
+- [x] `ci-testcontainers-snapshot` profilini mevcut integration suite'indeki gerekli senaryoların tamamını çalıştıracak şekilde güncelle.
+- [x] Kullanılmayan LocalStack bağımlılığını CI test yolundan kaldır.
+- [x] Çıktısı tüketilmeyen `aggregate-matching` bağımlılığını CI test yolundan kaldır.
+- [x] Testcontainers profillerinin beklenen feature ve scenario sayısının altına düşmesi halinde CI'ı fail eden otomatik kontrol ekle.
 
-- [x] `b9cc3a2` taşıma commit'inde yanlışlıkla silinen CI/repo dotfile'larını eski `test2/` altından yeni repo köküne taşı:
-  - `.drone.star`
-  - `.drone/slack-functions.sh`
-  - `.gitignore`
-  - `.trivyignore`
-- [x] Taşınan `.drone.star` dosyasının repo kökünden render/parse edildiğini doğrula.
-- [x] Pipeline'ın mevcut build, integration-test, Trivy ve publish adımlarını yeniden ürettiğini smoke-test et.
+## P0 — Testcontainers'ı Compose yolunun yerine geçir
 
-**Kanıt:** `git diff --name-status af9445d..HEAD` bu dosyaların taşıma commit'inde `D test2/...` olarak kaybolduğunu gösterdi. Dosyalar `af9445d` blob'larından repo köküne geri alındı ve her biri `cmp` ile geçmişteki içeriğiyle birebir doğrulandı. `.drone.star` Python AST parse kontrolünden geçti; fake Drone context ile feature push, master push, MR, cron ve tag yolları render edildi. CI render'ında build, integration-test, Trivy ve notification adımları; tag render'ında publish/CD/cleardown pipeline'ları doğrulandı.
+- [x] Normal CI ile ayrı Testcontainers pipeline'ının birlikte çalışmasını engelle; bir build'de yalnız bir integration-test yolu seçilsin.
+- [x] Testcontainers snapshot suite'ini branch CI için varsayılan integration-test yolu yap.
+- [x] Compose tabanlı `Kafka & Redis` adımını CI'dan kaldır.
+- [x] Compose tabanlı `Aggregators` adımını CI'dan kaldır.
+- [x] `Pre-Integration Tests` Compose startup adımını CI'dan kaldır.
+- [x] Compose tabanlı `Integration Tests` adımını CI'dan kaldır.
+- [x] Command adaptor image build'ini test startup bağımlılığı olmaktan çıkar.
+- [x] Docker image build ve Trivy taramasını Compose test altyapısından ayır.
+- [x] Publish adımlarının ihtiyaç duyduğu local/registry image tag'lerini yeni akışta üret.
 
-**Bitti sayılma koşulu:** Dotfile'lar repo kökünde mevcut, Drone config başarıyla render oluyor ve taşıma öncesindeki pipeline adımları kayıpsız mevcut. Dosyaların kalıcı olarak tracked olması yapılacak commit'e bağlıdır.
+## P0 — Tek Maven build/test akışı oluştur
 
-## P0 — Opt-in Testcontainers branch-CI yolunu gerçekten bağla
+- [x] Normal pipeline'daki `mvn clean install` ile ayrı Testcontainers pipeline'ındaki `mvn -am clean verify` tekrarını kaldır.
+- [x] Compile, unit test ve integration testleri tek `mvn clean verify` reactor akışında çalıştır.
+- [x] Testcontainers Maven profilini mevcut reactor üzerinde tek sefer çalıştır.
+- [x] Maven workspace ve repository cache kullanımını aynı pipeline içinde koru.
 
-- [x] Geri getirilen RepoSync/Drone tanımına, varsayılan CI davranışını değiştirmeyen açık bir opt-in koşulu ekle.
-- [x] Opt-in command-path çalıştırmasını `ci-testcontainers-cmd` profiline bağla.
-- [x] Opt-in tam snapshot çalıştırmasını `ci-testcontainers-snapshot` profiline bağla.
-- [x] DIND, `DOCKER_HOST`, host override ve Ryuk ayarlarını opt-in branch job'una ekle; job'u varsayılan olarak kapalı tut.
+## P1 — Container başlangıç süresini azalt
 
-**Kanıt:** `.drone.star`, `TESTCONTAINERS_SUITE=cmd|snapshot` build parametresini ve `[testcontainers-cmd]` / `[testcontainers-snapshot]` commit-message işaretlerini destekliyor. Geçersiz veya eksik opt-in değerinde yalnız normal `CI` üretiliyor. Opt-in pipeline ayrı DIND service, `DOCKER_HOST=tcp://docker:2375`, `TESTCONTAINERS_HOST_OVERRIDE=docker`, disabled Ryuk ve private registry Docker auth config ile ilgili Maven profilini çalıştırıyor. Gerçek Drone koşusu repository push/CI yetkisi gerektiriyor ve henüz yapılmadı.
+- [x] `MinimalRedisTest` çalışırken gereksiz ZooKeeper, Kafka ve Schema Registry container'larının başlamasını engelle.
+- [x] Shared environment'a Redis-only ve messaging/full-snapshot lazy startup uygula.
+- [x] Redis'i Kafka bağımlılık zincirinden bağımsız başlat.
+- [x] Redis ve ZooKeeper başlangıcını `Startables.deepStart(...)` ile paralelleştir; Kafka → Schema Registry sırasını koru.
+- [x] Birbirinden bağımsız aggregate container'larını ve readiness kontrollerini paralel başlat.
+- [x] Command suite'inde aggregate başlatma; snapshot suite'inde yalnız tüketilen beş entity aggregate'ini başlat.
+- [x] Ayrı Testcontainers smoke CI adımını kaldır ve full suite'teki ikinci altyapı başlangıcını engelle.
 
-**Bitti sayılma koşulu:** Açıkça tetiklenen branch config'i Redis + Kafka + Schema Registry tabanlı command veya snapshot suite'ini üretiyor; normal branch pipeline bundan etkilenmiyor.
+## P1 — DIND ve image çekme maliyetini azalt
 
-## P1 — Testcontainers container loglarını hata anında erişilebilir yap
+- [x] Testcontainers Docker Hub image'larını private registry/mirror üzerinden çekecek image-name substitution ekle.
+- [x] DIND image çekimlerini private registry proxy cache üzerinden geçir; adaptor image için registry-backed branch/develop cache'i koru.
+- [x] Container image pull/start işlemlerini bağımsız servis gruplarında paralelleştir.
+- [x] Disabled Ryuk kullanımında başarılı ve hatalı koşul sonunda container ve network cleanup'ını otomatikleştir.
 
-- [x] Redis, ZooKeeper, Kafka, Schema Registry ve opt-in aggregate container'lara failure-time log capture ekle.
-- [x] Startup exception ve test/assertion failure durumunda ilgili container loglarını test çıktısına bas.
-- [x] Başarılı koşularda gereksiz tam log dökümünü engelle; failure diagnostics odaklı çalıştır.
+## P1 — Pipeline süresini otomatik kontrol et
 
-**Kanıt:** `SnsTestcontainersEnvironment.dumpContainerLogs(...)` yalnız startup veya test failure yolundan `getLogs()` çağırıyor. JUnit 5 smoke testleri `TestcontainersFailureDiagnostics` watcher'ını, Cucumber ise failed `TestRunFinished` sonucunu kullanıyor. Runtime failure-injection doğrulaması özel FDP BOM engeli nedeniyle henüz çalıştırılamadı.
+- [x] CI adımlarına makine tarafından okunabilir süre ölçümü ekle.
+- [x] Testcontainers verify adımı 720 saniyeyi aşarsa CI'ı fail eden kontrol ekle.
+- [x] Toplam branch pipeline'ı 815 saniyelik Compose baseline'ı aşarsa CI'ı fail eden kontrol ekle.
+- [x] Opt-in işaretlerini ve geçici çift-pipeline desteğini kaldır.
 
-**Bitti sayılma koşulu:** Startup, JUnit assertion ve Cucumber run failure handler'ları container loglarını shutdown öncesinde test/CI çıktısına aktarıyor.
+## Tamamlanma kriteri
 
-## P1 — Tek başına Redis smoke çalıştırmasının deterministik cleanup'ını tamamla
-
-- [x] `MinimalRedisTest` dahil tüm JUnit smoke suite'i sonunda shared environment'ı kapatan lifecycle cleanup ekle.
-- [x] Başarılı suite kapanışını root-store `CloseableResource`, test hatasını `TestWatcher` üzerinden aynı `shutdown()` yoluna bağla.
-- [x] Kafka/Schema Registry ve Redis smoke sınıflarını aynı suite-level cleanup mekanizmasına bağla.
-
-**Kanıt:** `TestcontainersFailureDiagnostics` root-store `CloseableResource` ile tüm JUnit smoke sınıfları bittikten sonra `shutdown()` çağırıyor. Bu tasarım class sırasına göre erken kapanmayı önlüyor. `shutdown()` tüm container'ları durdurup shared network'ü kapatıyor; Cucumber `TestRunFinished` de aynı yolu kullanıyor. Runtime leak kontrolü özel FDP BOM engeli nedeniyle henüz çalıştırılamadı.
-
-**Bitti sayılma koşulu:** Shared suite kapanışında bütün container'lar durduruluyor ve Testcontainers network'ü kapatılıyor.
-
-## P1 — Tam migrated suite yolunu tamamla
-
-- [x] Command-path suite'ini `local-testcontainers` ve `ci-testcontainers-cmd` profillerine bağla.
-- [x] Tam snapshot suite'ini `local-testcontainers-snapshot` ve `ci-testcontainers-snapshot` profillerine bağla.
-- [x] Snapshot profillerinde Cucumber tag filtresi uygulamayarak mevcut 7 feature dosyasındaki 14 scenario'nun tamamını kapsa.
-- [x] Testcontainers çalıştırmalarında Compose startup'ını kapat, fakat mevcut Compose yolunu parity kabulüne kadar koru.
-- [x] Run başına dinamik topic suffix, consumer group ve Redis/test verisi izolasyonunu koru.
-
-**Kanıt:** Shared fixture, dört opt-in Maven profili, dinamik endpoint/topic wiring ve Cucumber entegrasyonu repo içinde mevcut. Statik inventory 7 feature dosyası, 14 scenario ve sıfır `@ignore` scenario gösteriyor.
-
-## P1 — Registry cache'in `develop` paylaşım döngüsünü tamamla
-
-- [x] `develop` build'inin shared cache ref'ini seed/update edeceği pipeline yolunu ekle.
-- [x] Feature branch build'inin hem shared `develop` hem branch-specific cache ref'ini kullanacağı yolu ekle.
-- [x] JAR kopyalarını pahalı OS/envconsul katmanlarından sonra tutarak JAR değişiminde yalnız artefact ve sonraki katmanları invalidate et.
-- [x] Buildx kullanılan yolda üretilen image'ı sonraki `docker-compose --no-build` adımı için `--load` ile yerel daemon'a yükle.
-
-**Kanıt:** Dockerfile layer ordering ve `.dockerignore` implementasyonu mevcut. Cache komutlarını taşıyan `.drone.star` geri getirildi ve hem develop hem feature buildx dallarına `--load` eklendi. Gerçek shared-registry seed/reuse doğrulaması hâlâ develop ve sonraki feature-branch Drone koşularını gerektiriyor.
-
-**Bitti sayılma koşulu:** Develop/feature cache yolları config'de mevcut ve Buildx çıktısı `--load` ile compose'un kullandığı local image tag'ine yükleniyor.
-
-## Dış ortam kabul kontrolleri — implementasyon TODO'su değil
-
-Aşağıdakiler repo içinde yazılacak kod değildir; yetkili ağ/credential ve gerçek Drone build'i gerektiren release kabul kapılarıdır:
-
-- Artifactory/VPN erişimli ortamda command suite'i bir, snapshot suite'i iki kez çalıştırmak.
-- Başarılı ve bilerek hatalı koşuda container logları ile cleanup/leak davranışını gözlemek.
-- Gerçek branch Drone koşusunda DIND, host override ve disabled-Ryuk davranışını doğrulamak.
-- Bir `develop` cache seed ve sonraki feature-branch reuse koşusunda registry cache hit/rebuild çıktılarını kontrol etmek.
-
-Bu ortamda Artifactory DNS'i çözülemiyor (`HTTP 000`) ve `ARTIFACTORY_USERNAME`, `ARTIFACTORY_PASSWORD`, `JFROG_TOKEN` tanımlı değil. Bu kontroller bu nedenle çalıştırılamadı; implementasyon checkbox'ları olarak açık bırakılmadı.
-
-## Doğrulanmış, yeniden yapılmaması gerekenler
-
-- `cmd-adaptor-sns/Dockerfile` içinde pahalı OS/envconsul setup katmanı runtime JAR kopyalarından önce yer alıyor.
-- RepoSync warning header, base image, runtime user, workdir ve `CMD` korunmuş.
-- `cmd-adaptor-sns/.dockerignore` yalnız iki zorunlu runtime artefact'ını build context'e geri alıyor.
-- Redis, Kafka ve Schema Registry shared Testcontainers network/fixture içinde tanımlı; host portları dinamik.
-- Redis/Kafka/Schema Registry readiness kontrolleri ve Kafka/Schema Registry smoke testleri mevcut.
-- Testcontainers Maven bağımlılıkları test scope'ta ve yol opt-in profiller altında.
-- Mevcut Docker Compose yolu silinmemiş.
-
-## Audit notu
-
-`xmllint` ile kök ve integration-test POM dosyalarının XML yapısı doğrulandı; `bash -n` ile geri getirilen Slack script'i kontrol edildi; `.drone.star` tüm temel event ve opt-in varyantlarında statik olarak render edildi; render edilen feature-push step command bloklarının tamamı `/bin/sh -n` kontrolünden geçti; `git diff --check` temiz geçti. Docker daemon erişimi ayrıca doğrulandı.
-
-Tam Maven doğrulaması iki kez denendi. `mvn -pl cmd-adaptor-sns-integration-tests -am -Plocal-testcontainers -Dtest='*RedisTest,*SmokeTest' -Dsurefire.failIfNoSpecifiedTests=false test` proje modeli oluşturulurken özel `uk.gov.ho.dacc.fdp:fdp-bom:3.2.11` çözülemedi. Yerelde cache'li `ileap-java17-mvn:1.3` image'ı gerekli Artifactory mirror ayarını içeriyor ancak BOM'u cache'inde ve çalışma ortamında Artifactory credentials yok. Bu nedenle gerçek smoke/tam-suite, leak/failure-injection ve develop/branch registry-cache koşuları tamamlanmış sayılmadı.
+- [x] Varsayılan branch CI yalnız Testcontainers tabanlı integration suite'i çalıştırıyor.
+- [x] Test kapsamının 7 feature/14 scenario altına düşmesini engelleyen otomatik guard mevcut.
+- [x] Aynı build içinde ikinci Maven build'i veya ikinci integration-test pipeline'ı çalışmıyor.
+- [x] Docker Compose test altyapısı CI kritik yolundan çıkarılmış durumda.
+- [x] Docker image build, Trivy ve publish akışları render edilen pipeline'da mevcut.

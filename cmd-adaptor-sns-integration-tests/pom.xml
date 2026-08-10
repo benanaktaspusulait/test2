@@ -18,6 +18,7 @@
         <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
         <sns.testcontainers.enabled>false</sns.testcontainers.enabled>
         <sns.testcontainers.aggregators.enabled>false</sns.testcontainers.aggregators.enabled>
+        <sns.testcontainers.expected-scenarios>0</sns.testcontainers.expected-scenarios>
         <failsafe.excludes>none</failsafe.excludes>
         <cucumber.filter.tags/>
     </properties>
@@ -126,8 +127,9 @@
                 <skip.containers>true</skip.containers>
                 <skip.aggregators>true</skip.aggregators>
                 <skip.integration.tests>false</skip.integration.tests>
-                <surefire.excludedGroups/>
+                <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
                 <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
+                <sns.testcontainers.expected-scenarios>1</sns.testcontainers.expected-scenarios>
                 <cucumber.filter.tags><![CDATA[@cmd and not @ignore]]></cucumber.filter.tags>
                 <failsafe.excludes>none</failsafe.excludes>
             </properties>
@@ -139,9 +141,10 @@
                 <skip.containers>true</skip.containers>
                 <skip.aggregators>true</skip.aggregators>
                 <skip.integration.tests>false</skip.integration.tests>
-                <surefire.excludedGroups/>
+                <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
                 <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
                 <sns.testcontainers.aggregators.enabled>true</sns.testcontainers.aggregators.enabled>
+                <sns.testcontainers.expected-scenarios>14</sns.testcontainers.expected-scenarios>
                 <failsafe.excludes>none</failsafe.excludes>
             </properties>
         </profile>
@@ -152,8 +155,9 @@
                 <skip.containers>true</skip.containers>
                 <skip.aggregators>true</skip.aggregators>
                 <skip.integration.tests>false</skip.integration.tests>
-                <surefire.excludedGroups/>
+                <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
                 <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
+                <sns.testcontainers.expected-scenarios>1</sns.testcontainers.expected-scenarios>
                 <cucumber.filter.tags><![CDATA[@cmd and not @ignore]]></cucumber.filter.tags>
                 <failsafe.excludes>none</failsafe.excludes>
             </properties>
@@ -165,9 +169,10 @@
                 <skip.containers>true</skip.containers>
                 <skip.aggregators>true</skip.aggregators>
                 <skip.integration.tests>false</skip.integration.tests>
-                <surefire.excludedGroups/>
+                <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
                 <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
                 <sns.testcontainers.aggregators.enabled>true</sns.testcontainers.aggregators.enabled>
+                <sns.testcontainers.expected-scenarios>14</sns.testcontainers.expected-scenarios>
                 <failsafe.excludes>none</failsafe.excludes>
             </properties>
         </profile>
@@ -341,6 +346,7 @@
                                 <cucumber.filter.tags>${cucumber.filter.tags}</cucumber.filter.tags>
                                 <sns.testcontainers.enabled>${sns.testcontainers.enabled}</sns.testcontainers.enabled>
                                 <sns.testcontainers.aggregators.enabled>${sns.testcontainers.aggregators.enabled}</sns.testcontainers.aggregators.enabled>
+                                <sns.testcontainers.expected-scenarios>${sns.testcontainers.expected-scenarios}</sns.testcontainers.expected-scenarios>
                             </systemPropertyVariables>
                             <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                             <excludes>

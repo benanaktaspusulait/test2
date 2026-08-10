@@ -136,76 +136,6 @@ def blank_pipeline(name, depends_on=None):
     return response
 
 
-def requested_testcontainers_suite(ctx):
-    """Return the explicitly requested opt-in Testcontainers suite, if any."""
-    params = getattr(ctx.build, 'params', {})
-    suite = params.get('TESTCONTAINERS_SUITE', '')
-    message = getattr(ctx.build, 'message', '')
-
-    if '[testcontainers-snapshot]' in message:
-        suite = 'snapshot'
-    elif '[testcontainers-cmd]' in message:
-        suite = 'cmd'
-
-    if suite in ['cmd', 'snapshot']:
-        return suite
-    return ''
-
-
-def testcontainers_pipeline(ctx, suite):
-    """Create an explicit, non-default branch pipeline for the migrated suite."""
-    profile = 'ci-testcontainers-%s' % suite
-    response = blank_pipeline('Testcontainers %s' % suite)
-    response = add_pipeline_service(
-        response,
-        {
-            'name': 'docker',
-            'image': DIND_IMAGE
-        }
-    )
-    response = add_pipeline_step(
-        response,
-        retrieve_vault_dev_secrets_step(
-            name='Retrieve Artifactory Secrets',
-            drone_deploy_to=ctx.build.target
-        )
-    )
-    response = add_pipeline_step(
-        response,
-        {
-            'name': 'Wait for Docker',
-            'image': DIND_IMAGE,
-            'commands': ['/usr/local/bin/wait'],
-            'depends_on': ['Retrieve Artifactory Secrets']
-        }
-    )
-    response = add_pipeline_step(
-        response,
-        {
-            'name': 'Run Testcontainers %s suite' % suite,
-            'image': MAVEN_JAVA17_IMAGE,
-            'commands': [
-                '. ./set_drone_secrets.sh',
-                'export DOCKER_CONFIG=/tmp/testcontainers-docker-config',
-                'mkdir -p "$${DOCKER_CONFIG}"',
-                'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
-                'printf "{\\\"auths\\\":{\\\"%s\\\":{\\\"auth\\\":\\\"%%s\\\"}}}" "$${AUTH_VALUE}" > "$${DOCKER_CONFIG}/config.json"' % ARTIFACTORY_REGISTRY,
-                'mvn -pl cmd-adaptor-%s-integration-tests -am clean verify -P%s' % (COMMAND_ADAPTOR_NAME, profile)
-            ],
-            'environment': {
-                'DOCKER_HOST': 'tcp://docker:2375',
-                'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
-                'TESTCONTAINERS_RYUK_DISABLED': 'true'
-            },
-            'depends_on': [
-                'Retrieve Artifactory Secrets',
-                'Wait for Docker'
-            ]
-        }
-    )
-    return response
-
-
 def ci_pipeline(ctx):
     """
     Create a Continuous Integration (CI) Pipeline.
@@ -266,62 +196,27 @@ def ci_pipeline(ctx):
     response = add_pipeline_step(
         response,
         {
-            'name': 'Kafka & Redis',
-            'image': DIND_IMAGE,
-            'commands': [
-                '. ./set_drone_secrets.sh',
-                'apk add --no-cache ca-certificates docker-compose && update-ca-certificates',
-                'echo "$${ARTIFACTORY_PASSWORD}" | docker login -u "$${ARTIFACTORY_USERNAME}" --password-stdin docker.digital.homeoffice.gov.uk',
-                'docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml run --rm wait4localstack /usr/local/bin/wait4localstack -ve http://localstack:4566/health' % COMMAND_ADAPTOR_NAME,
-                'WAIT_CHECK="redis_kafka" docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml up pre-integration-test' % COMMAND_ADAPTOR_NAME
-            ],
-            'environment': {
-                'ADAPTOR_NAME': COMMAND_ADAPTOR_NAME,
-                'DOCKER_HOST': 'tcp://docker:2375',
-                'COMPOSE_PARALLEL_LIMIT': '1'
-            },
-            'depends_on': [
-                'Wait for Docker'
-            ]
-        }
-    )
-
-    response = add_pipeline_step(
-        response,
-        {
-            'name': 'Aggregators',
-            'image': DIND_IMAGE,
-            'commands': [
-                '. ./set_drone_secrets.sh',
-                'apk add --no-cache ca-certificates docker-compose && update-ca-certificates',
-                'echo "$${ARTIFACTORY_PASSWORD}" | docker login -u "$${ARTIFACTORY_USERNAME}" --password-stdin docker.digital.homeoffice.gov.uk',
-                'source CORE_TAG.env',
-                'docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml up -d aggregate-matching aggregate-event aggregate-location aggregate-object aggregate-party aggregate-service' % COMMAND_ADAPTOR_NAME
-            ],
-            'environment': {
-                'ADAPTOR_NAME': COMMAND_ADAPTOR_NAME
-            },
-            'depends_on': [
-                'Extract Adaptor Information',
-                'Kafka & Redis'
-            ]
-        }
-    )
-
-    response = add_pipeline_step(
-        response,
-        {
-            'name': 'mvn clean install',
+            'name': 'Build and Test with Testcontainers',
             'image': MAVEN_JAVA17_IMAGE,
             'commands': [
                 '. ./set_drone_secrets.sh',
-                "echo -n 'export CORE_TAG=' > CORE_TAG.env",
-                'mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=aggregator-core.version -q -DforceStdout',
-                'mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=aggregator-core.version -q -DforceStdout >> CORE_TAG.env',
-                'cat CORE_TAG.env',
-                "[[ $( cat CORE_TAG.env| wc -w | sed 's/[ \t]//g' ) == 2 ]]",
-                'mvn clean install'
+                'export DOCKER_CONFIG=/tmp/testcontainers-docker-config',
+                'mkdir -p "$${DOCKER_CONFIG}"',
+                'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
+                'printf "{\\\"auths\\\":{\\\"%s\\\":{\\\"auth\\\":\\\"%%s\\\"}}}" "$${AUTH_VALUE}" > "$${DOCKER_CONFIG}/config.json"' % ARTIFACTORY_REGISTRY,
+                'TEST_START=$(date +%s)',
+                'mvn clean verify -Pci-testcontainers-snapshot',
+                'TEST_DURATION=$(($(date +%s)-TEST_START))',
+                'echo "CI_TIMING name=testcontainers_verify duration_seconds=$${TEST_DURATION}"',
+                'if [ "$${TEST_DURATION}" -gt "$${TESTCONTAINERS_MAX_SECONDS}" ]; then echo "Testcontainers verify exceeded $${TESTCONTAINERS_MAX_SECONDS}s"; exit 1; fi'
             ],
+            'environment': {
+                'DOCKER_HOST': 'tcp://docker:2375',
+                'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
+                'TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX': 'docker.digital.homeoffice.gov.uk/',
+                'TESTCONTAINERS_RYUK_DISABLED': 'true',
+                'TESTCONTAINERS_MAX_SECONDS': '720'
+            },
             'depends_on': [
                 'Extract Adaptor Information'
             ]
@@ -331,11 +226,10 @@ def ci_pipeline(ctx):
     response = add_pipeline_step(
         response,
         {
-            'name': 'Command Adaptor',
+            'name': 'Build Command Adaptor Image',
             'image': DIND_IMAGE,
             'commands': [
                 '. ./set_drone_secrets.sh',
-                'apk add --no-cache ca-certificates docker-compose && update-ca-certificates',
                 'echo "$${ARTIFACTORY_PASSWORD}" | docker login -u "$${ARTIFACTORY_USERNAME}" --password-stdin %s' % ARTIFACTORY_REGISTRY,
                 'COMMAND_ADAPTOR_IMAGE="docker-compose-command-adaptor:latest"',
                 'CACHE_IMAGE_REPO="%s/%s"' % (ARTIFACTORY_REGISTRY, ARTIFACTORY_REPOSITORY),
@@ -343,101 +237,14 @@ def ci_pipeline(ctx):
                 'CACHE_REF_DEFAULT="$${CACHE_IMAGE_REPO}:cmd-adaptor-cache-develop"',
                 'CACHE_REF_BRANCH="$${CACHE_IMAGE_REPO}:cmd-adaptor-cache-$${CACHE_BRANCH_TAG}"',
                 'if docker buildx version >/dev/null 2>&1; then if [ "$${DRONE_BRANCH:-}" = "develop" ]; then docker buildx build --builder default --load --file cmd-adaptor-%s/Dockerfile --tag "$${COMMAND_ADAPTOR_IMAGE}" --cache-from=type=registry,ref="$${CACHE_REF_DEFAULT}" --cache-to=type=registry,ref="$${CACHE_REF_DEFAULT}",mode=max cmd-adaptor-%s; else docker buildx build --builder default --load --file cmd-adaptor-%s/Dockerfile --tag "$${COMMAND_ADAPTOR_IMAGE}" --cache-from=type=registry,ref="$${CACHE_REF_DEFAULT}" --cache-from=type=registry,ref="$${CACHE_REF_BRANCH}" --cache-to=type=registry,ref="$${CACHE_REF_BRANCH}",mode=max cmd-adaptor-%s; fi; else echo "buildx not available - using inline cache fallback"; if [ "$${DRONE_BRANCH:-}" = "develop" ]; then docker pull "$${CACHE_REF_DEFAULT}" || true; DOCKER_BUILDKIT=1 docker build --build-arg BUILDKIT_INLINE_CACHE=1 --cache-from "$${CACHE_REF_DEFAULT}" -t "$${COMMAND_ADAPTOR_IMAGE}" -f cmd-adaptor-%s/Dockerfile cmd-adaptor-%s; docker tag "$${COMMAND_ADAPTOR_IMAGE}" "$${CACHE_REF_DEFAULT}"; docker push "$${CACHE_REF_DEFAULT}"; else docker pull "$${CACHE_REF_BRANCH}" || true; docker pull "$${CACHE_REF_DEFAULT}" || true; DOCKER_BUILDKIT=1 docker build --build-arg BUILDKIT_INLINE_CACHE=1 --cache-from "$${CACHE_REF_BRANCH}" --cache-from "$${CACHE_REF_DEFAULT}" -t "$${COMMAND_ADAPTOR_IMAGE}" -f cmd-adaptor-%s/Dockerfile cmd-adaptor-%s; docker tag "$${COMMAND_ADAPTOR_IMAGE}" "$${CACHE_REF_BRANCH}"; docker push "$${CACHE_REF_BRANCH}"; fi; fi' % (COMMAND_ADAPTOR_NAME, COMMAND_ADAPTOR_NAME, COMMAND_ADAPTOR_NAME, COMMAND_ADAPTOR_NAME, COMMAND_ADAPTOR_NAME, COMMAND_ADAPTOR_NAME, COMMAND_ADAPTOR_NAME, COMMAND_ADAPTOR_NAME),
-                'docker image inspect "$${COMMAND_ADAPTOR_IMAGE}" >/dev/null',
-                'COMMAND_ADAPTOR_IMAGE="$${COMMAND_ADAPTOR_IMAGE}" WAIT_CHECK="command_adaptor" docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml up --no-build command-adaptor' % COMMAND_ADAPTOR_NAME
+                'docker image inspect "$${COMMAND_ADAPTOR_IMAGE}" >/dev/null'
             ],
             'environment': {
                 'ADAPTOR_NAME': COMMAND_ADAPTOR_NAME,
                 'DOCKER_HOST': 'tcp://docker:2375'
             },
             'depends_on': [
-                'mvn clean install',
-                'Kafka & Redis'
-            ],
-            'detach': True
-        }
-    )
-
-    if COMMAND_ADAPTOR_NAME == 'ctp':
-        response = add_pipeline_step(
-            response,
-            {
-                'name': 'Reporting Adaptor',
-                'image': DIND_IMAGE,
-                'commands': [
-                    '. ./set_drone_secrets.sh',
-                    'apk add --no-cache ca-certificates docker-compose && update-ca-certificates',
-                    'WAIT_CHECK="command_adaptor" docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml up --build command-adaptor-reporting' % COMMAND_ADAPTOR_NAME
-                ],
-                'environment': {
-                    'ADAPTOR_NAME': COMMAND_ADAPTOR_NAME
-                },
-                'depends_on': [
-                    'mvn clean install',
-                    'Kafka & Redis'
-                ],
-                'detach': True
-            }
-        )
-
-    response = add_pipeline_step(
-        response,
-        {
-            'name': 'Pre-Integration Tests',
-            'image': DIND_IMAGE,
-            'commands': [
-                '. ./set_drone_secrets.sh',
-                'apk add --no-cache ca-certificates docker-compose && update-ca-certificates',
-                './bin/pre-integration-test.sh'
-            ],
-            'environment': {
-                'ADAPTOR_NAME': COMMAND_ADAPTOR_NAME,
-                'DOCKER_HOST': 'tcp://docker:2375'
-            },
-            'depends_on': [
-                'Aggregators',
-                'mvn clean install'
-            ]
-        }
-    )
-    response = add_pipeline_step(
-        response,
-        {
-            'name': 'Testcontainers Smoke Tests',
-            'image': MAVEN_JAVA17_IMAGE,
-            'commands': [
-                '. ./set_drone_secrets.sh',
-                'mvn -pl cmd-adaptor-%s-integration-tests -Pci-snapshot -Dskip.integration.tests=false -Dsurefire.excludedGroups= -Dtest=MinimalRedisTest test -DfailIfNoTests=false' % COMMAND_ADAPTOR_NAME
-            ],
-            'environment': {
-                'DOCKER_HOST': 'tcp://docker:2375',
-                'TESTCONTAINERS_RYUK_DISABLED': 'true',
-            },
-            'depends_on': [
-                'Wait for Docker',
-                'mvn clean install'
-            ]
-        }
-    )
-    response = add_pipeline_step(
-        response,
-        {
-            'name': 'Integration Tests',
-            'image': DIND_IMAGE,
-            'commands': [
-                '. ./set_drone_secrets.sh',
-                'apk add --no-cache ca-certificates docker-compose && update-ca-certificates',
-                'WAIT_CHECK="command_adaptor" docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml up pre-integration-test' % COMMAND_ADAPTOR_NAME,
-                'WAIT_CHECK="aggregators" docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml up pre-integration-test' % COMMAND_ADAPTOR_NAME,
-                'docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml ps' % COMMAND_ADAPTOR_NAME,
-                'docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml up --exit-code-from integration-tests integration-tests' % COMMAND_ADAPTOR_NAME,
-                './bin/integration-test.sh'
-            ],
-            'environment': {
-                'ADAPTOR_NAME': COMMAND_ADAPTOR_NAME
-            },
-            'depends_on': [
-                'Pre-Integration Tests'
+                'Build and Test with Testcontainers'
             ]
         }
     )
@@ -455,7 +262,7 @@ def ci_pipeline(ctx):
                 'branch': ['develop']
             },
             'depends_on': [
-                'mvn clean install'
+                'Build and Test with Testcontainers'
             ]
         }
     )
@@ -465,13 +272,19 @@ def ci_pipeline(ctx):
         {
             'name': 'Scan with Trivy',
             'depends_on': [
-                'Integration Tests'
+                'Build Command Adaptor Image'
             ],
             'commands': [
                 # PM-75944: updated application to use ecr trivy db
-                'trivy image --exit-code 0 --no-progress docker-compose-command-adaptor:latest --severity CRITICAL,HIGH --ignore-unfixed --db-repository  acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db'
+                'trivy image --exit-code 0 --no-progress docker-compose-command-adaptor:latest --severity CRITICAL,HIGH --ignore-unfixed --db-repository  acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db',
+                'PIPELINE_DURATION=$(($(date +%s)-$${DRONE_BUILD_STARTED}))',
+                'echo "CI_TIMING name=branch_pipeline duration_seconds=$${PIPELINE_DURATION}"',
+                'if [ "$${PIPELINE_DURATION}" -gt 815 ]; then echo "Branch pipeline exceeded 815s"; exit 1; fi'
             ],
-            'image': TRIVY_IMAGE
+            'image': TRIVY_IMAGE,
+            'environment': {
+                'DOCKER_HOST': 'tcp://docker:2375'
+            }
         }
     )
 
@@ -1586,9 +1399,6 @@ def main(ctx):
         else:
             pipelines.append(ci_pipeline(ctx))
 
-        testcontainers_suite = requested_testcontainers_suite(ctx)
-        if ctx.build.branch != 'master' and testcontainers_suite:
-            pipelines.append(testcontainers_pipeline(ctx, testcontainers_suite))
     elif ctx.build.event == 'pull_request':
         pipelines.append(blank_pipeline('GitLab MR'))
     elif ctx.build.event == 'tag':
