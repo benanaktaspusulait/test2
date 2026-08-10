@@ -26,6 +26,15 @@ mvn -pl cmd-adaptor-sns-integration-tests -am clean verify -Plocal-testcontainer
 For CI-style names, the same runs are available as
 `-Pci-testcontainers-cmd` and `-Pci-testcontainers-snapshot`.
 
+These profiles require a reachable Docker daemon with a supported Docker API.
+If Docker is unavailable, the Testcontainers Cucumber suite is skipped by
+default instead of failing during bootstrap. To make Docker availability a hard
+failure, add:
+
+```bash
+-Dsns.testcontainers.skip-if-docker-unavailable=false
+```
+
 ## Snapshot profile prerequisites
 
 To run snapshot tests with downstream aggregate images, connect to ACP VPN and

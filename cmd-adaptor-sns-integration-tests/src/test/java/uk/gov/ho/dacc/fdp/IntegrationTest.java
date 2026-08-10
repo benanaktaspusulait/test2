@@ -3,7 +3,10 @@ package uk.gov.ho.dacc.fdp;
 import io.cucumber.junit.Cucumber;
 import io.cucumber.junit.CucumberOptions;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.ClassRule;
 import org.junit.runner.RunWith;
+import org.junit.rules.ExternalResource;
+import uk.gov.ho.dacc.fdp.testcontainers.SnsTestcontainersEnvironment;
 
 @Slf4j
 @RunWith(Cucumber.class)
@@ -13,4 +16,11 @@ import org.junit.runner.RunWith;
         , tags = "not @ignore"
 )
 public class IntegrationTest {
+    @ClassRule
+    public static final ExternalResource testcontainersPrerequisites = new ExternalResource() {
+        @Override
+        protected void before() {
+            SnsTestcontainersEnvironment.assumeDockerAvailableIfEnabled();
+        }
+    };
 }

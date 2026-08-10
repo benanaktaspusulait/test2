@@ -17,6 +17,7 @@
         <jedis.version>4.4.3</jedis.version>
         <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
         <sns.testcontainers.enabled>false</sns.testcontainers.enabled>
+        <sns.testcontainers.skip-if-docker-unavailable>true</sns.testcontainers.skip-if-docker-unavailable>
         <sns.testcontainers.aggregators.enabled>false</sns.testcontainers.aggregators.enabled>
         <sns.testcontainers.expected-scenarios>0</sns.testcontainers.expected-scenarios>
         <failsafe.excludes>none</failsafe.excludes>
@@ -313,6 +314,7 @@
                 <configuration>
                     <systemPropertyVariables>
                         <sns.testcontainers.enabled>${sns.testcontainers.enabled}</sns.testcontainers.enabled>
+                        <sns.testcontainers.skip-if-docker-unavailable>${sns.testcontainers.skip-if-docker-unavailable}</sns.testcontainers.skip-if-docker-unavailable>
                         <sns.testcontainers.aggregators.enabled>${sns.testcontainers.aggregators.enabled}</sns.testcontainers.aggregators.enabled>
                     </systemPropertyVariables>
                     <excludedGroups>${surefire.excludedGroups}</excludedGroups>
@@ -345,6 +347,7 @@
                                 <cucumber.options>${cucumber.options}</cucumber.options>
                                 <cucumber.filter.tags>${cucumber.filter.tags}</cucumber.filter.tags>
                                 <sns.testcontainers.enabled>${sns.testcontainers.enabled}</sns.testcontainers.enabled>
+                                <sns.testcontainers.skip-if-docker-unavailable>${sns.testcontainers.skip-if-docker-unavailable}</sns.testcontainers.skip-if-docker-unavailable>
                                 <sns.testcontainers.aggregators.enabled>${sns.testcontainers.aggregators.enabled}</sns.testcontainers.aggregators.enabled>
                                 <sns.testcontainers.expected-scenarios>${sns.testcontainers.expected-scenarios}</sns.testcontainers.expected-scenarios>
                             </systemPropertyVariables>

@@ -2,10 +2,12 @@ package uk.gov.ho.dacc.fdp.testcontainers;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.junit.Assume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -44,6 +46,10 @@ public final class SnsTestcontainersEnvironment {
     private static final String SCHEMA_REGISTRY_IMAGE = "confluentinc/cp-schema-registry:7.9.7";
     private static final String AGGREGATE_IMAGE_BASE = "docker.digital.homeoffice.gov.uk/dacc-aws/fdp-aggregate-";
     private static final String AGGREGATOR_CORE_VERSION = System.getProperty("aggregator.core.version", "10.3.11");
+    private static final boolean TESTCONTAINERS_ENABLED =
+            Boolean.parseBoolean(System.getProperty("sns.testcontainers.enabled", "false"));
+    private static final boolean SKIP_IF_DOCKER_UNAVAILABLE =
+            Boolean.parseBoolean(System.getProperty("sns.testcontainers.skip-if-docker-unavailable", "true"));
     private static final boolean AGGREGATORS_ENABLED =
             Boolean.parseBoolean(System.getProperty("sns.testcontainers.aggregators.enabled", "false"));
 
@@ -107,6 +113,7 @@ public final class SnsTestcontainersEnvironment {
     private static volatile boolean messagingStarted = false;
     private static volatile boolean applicationStarted = false;
     private static volatile boolean networkClosed = false;
+    private static volatile boolean dockerAvailabilityChecked = false;
     private static volatile RuntimeException infrastructureStartupFailure;
     private static ConfigurableApplicationContext applicationContext;
     private static int applicationPort;
@@ -114,10 +121,36 @@ public final class SnsTestcontainersEnvironment {
     private SnsTestcontainersEnvironment() {
     }
 
+    public static synchronized void assumeDockerAvailableIfEnabled() {
+        if (!TESTCONTAINERS_ENABLED || dockerAvailabilityChecked) {
+            return;
+        }
+
+        String message = "SNS Testcontainers integration tests require a reachable Docker daemon with a supported "
+                + "Docker API. Set sns.testcontainers.enabled=false, use a non-Testcontainers profile, or provide "
+                + "Docker access to run these tests.";
+        try {
+            boolean dockerAvailable = DockerClientFactory.instance().isDockerAvailable();
+            if (!dockerAvailable && SKIP_IF_DOCKER_UNAVAILABLE) {
+                Assume.assumeTrue(message, false);
+            }
+            if (!dockerAvailable) {
+                throw new IllegalStateException(message);
+            }
+            dockerAvailabilityChecked = true;
+        } catch (RuntimeException e) {
+            if (SKIP_IF_DOCKER_UNAVAILABLE) {
+                Assume.assumeNoException(message, e);
+            }
+            throw e;
+        }
+    }
+
     public static synchronized void startInfrastructure() {
         if (networkClosed) {
             throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
         }
+        assumeDockerAvailableIfEnabled();
         if (messagingStarted) {
             return;
         }
