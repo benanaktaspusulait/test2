@@ -1,7 +1,7 @@
 From a10d6a5c82cda6af124c4d7504071c17d6b493f9 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Wed, 8 Jul 2026 09:43:25 +0100
-Subject: [PATCH 01/36] CST-2177 create .dockerignore file
+Subject: [PATCH 01/37] CST-2177 create .dockerignore file
 
 ---
  cmd-adaptor-sns/.dockerignore | 34 ++++++++++++++++++++++++++++++++++
@@ -56,7 +56,7 @@ GitLab
 From 3f7d9674ad2c7bf0595689be3f5136b143c87df6 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 9 Jul 2026 14:22:58 +0100
-Subject: [PATCH 02/36] =?UTF-8?q?CST-2189=20measuring=20T3.3=20=E2=80=94?=
+Subject: [PATCH 02/37] =?UTF-8?q?CST-2189=20measuring=20T3.3=20=E2=80=94?=
  =?UTF-8?q?=20Apply=20one=20safe=20Docker=20build=20optimisation?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -413,7 +413,7 @@ GitLab
 From 94822a6cb659b1853d0dbb70eb97b680813532c6 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Wed, 22 Jul 2026 09:41:42 +0100
-Subject: [PATCH 03/36] =?UTF-8?q?CST-2263=20T4.2=20=E2=80=94=20Implement?=
+Subject: [PATCH 03/37] =?UTF-8?q?CST-2263=20T4.2=20=E2=80=94=20Implement?=
  =?UTF-8?q?=20Redis=20Testcontainers=20smoke/wiring=20pilot?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -583,7 +583,7 @@ GitLab
 From b265940b8e4728239be3bd7374ae4e8c54d370b8 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 3 Aug 2026 11:27:18 +0100
-Subject: [PATCH 04/36] =?UTF-8?q?CST-2263=20T4.2=20=E2=80=94=20Implement?=
+Subject: [PATCH 04/37] =?UTF-8?q?CST-2263=20T4.2=20=E2=80=94=20Implement?=
  =?UTF-8?q?=20Redis=20Testcontainers=20smoke/wiring=20pilot?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -655,7 +655,7 @@ GitLab
 From b77989bd031e8b482e189ca0d061d2c827d0f2fa Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 09:18:59 +0100
-Subject: [PATCH 05/36] CST-2320 Polish Redis smoke test docs and Dockerfile
+Subject: [PATCH 05/37] CST-2320 Polish Redis smoke test docs and Dockerfile
  layering
 
 - Clarify MinimalRedisTest as an opt-in local Testcontainers smoke check
@@ -781,7 +781,7 @@ GitLab
 From ffa3e2dc45b2e444499104d3426b9bb143d01388 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 09:34:36 +0100
-Subject: [PATCH 06/36] CST-2320 fix
+Subject: [PATCH 06/37] CST-2320 fix
 
 ---
  .../fdp/testcontainers/MinimalRedisTest.java  | 74 ++++++++-----------
@@ -910,7 +910,7 @@ GitLab
 From 570727443352149fff5ff24bf2c2f498481b3d9b Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 10:15:01 +0100
-Subject: [PATCH 07/36] CST-2320 fix
+Subject: [PATCH 07/37] CST-2320 fix
 
 ---
  .drone.star                                   | 19 +++++++++++++++++++
@@ -1013,7 +1013,7 @@ GitLab
 From c923c690323a85e181197da07fad77e9eaee816f Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:09:05 +0100
-Subject: [PATCH 08/36] CST-2320 fix
+Subject: [PATCH 08/37] CST-2320 fix
 
 ---
  .drone.star                                          | 12 ++++++++++--
@@ -1064,7 +1064,7 @@ GitLab
 From 031a1ea370cf29ee5a3d7aefb8d0e65161ea7680 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:36:49 +0100
-Subject: [PATCH 09/36] chore: rerun pipeline
+Subject: [PATCH 09/37] chore: rerun pipeline
 
 -- 
 GitLab
@@ -1073,7 +1073,7 @@ GitLab
 From 14697326368e1bf808524d2f251046e0a2dd8914 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:37:10 +0100
-Subject: [PATCH 10/36] chore: rerun pipeline
+Subject: [PATCH 10/37] chore: rerun pipeline
 
 -- 
 GitLab
@@ -1082,7 +1082,7 @@ GitLab
 From 33ade900525b91582737f08fb450140f807d10de Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 12:14:22 +0100
-Subject: [PATCH 11/36] CST-2320 fix
+Subject: [PATCH 11/37] CST-2320 fix
 
 ---
  .drone.star | 3 ++-
@@ -1109,7 +1109,7 @@ GitLab
 From 9016df3220268f51094f59dc71e781a5adfc3779 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 12:48:53 +0100
-Subject: [PATCH 12/36] CST-2320 fix
+Subject: [PATCH 12/37] CST-2320 fix
 
 ---
  .drone.star | 2 +-
@@ -1135,7 +1135,7 @@ GitLab
 From 1d2de3b061ffd50c34185f5ef3d71b70d1d49f79 Mon Sep 17 00:00:00 2001
 From: Allen Conquest <allen.conquest1@homeoffice.gov.uk>
 Date: Mon, 3 Aug 2026 16:46:45 +0100
-Subject: [PATCH 13/36] Update versions for release
+Subject: [PATCH 13/37] Update versions for release
 
 ---
  cmd-adaptor-sns-avro/pom.xml              | 2 +-
@@ -1231,7 +1231,7 @@ GitLab
 From 185fbe8ff134babfb5f6bd9d19b919147071c6fe Mon Sep 17 00:00:00 2001
 From: Allen Conquest <allen.conquest1@homeoffice.gov.uk>
 Date: Mon, 3 Aug 2026 16:50:08 +0100
-Subject: [PATCH 14/36] update changelog
+Subject: [PATCH 14/37] update changelog
 
 ---
  CHANGELOG.md                                  | 32 ++++++++++++++++
@@ -1333,7 +1333,7 @@ GitLab
 From 00de92e28f1d8da0bb55a5ec00fa776ee2d817a6 Mon Sep 17 00:00:00 2001
 From: Allen Conquest <allen.conquest1@homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 09:24:35 +0100
-Subject: [PATCH 15/36] Update for next development version
+Subject: [PATCH 15/37] Update for next development version
 
 ---
  cmd-adaptor-sns-avro/pom.xml              | 2 +-
@@ -1429,7 +1429,7 @@ GitLab
 From b37518877a37db23389df7d0a1be3ccbeb523c7e Mon Sep 17 00:00:00 2001
 From: d-ziam <MohammadMeraj.zia@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 09:45:33 +0100
-Subject: [PATCH 16/36] CST-2326 - Incorporate Review comments by modifying the
+Subject: [PATCH 16/37] CST-2326 - Incorporate Review comments by modifying the
  poleV2Id
 
 ---
@@ -1480,7 +1480,7 @@ GitLab
 From fbb0123213b01380b40357c1c39233d58c44bc13 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:36:49 +0100
-Subject: [PATCH 17/36] chore: rerun pipeline
+Subject: [PATCH 17/37] chore: rerun pipeline
 
 -- 
 GitLab
@@ -1489,7 +1489,7 @@ GitLab
 From d7c877433f1738cc430d7ebb8c9aaf655cd50d97 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:37:10 +0100
-Subject: [PATCH 18/36] chore: rerun pipeline
+Subject: [PATCH 18/37] chore: rerun pipeline
 
 -- 
 GitLab
@@ -1498,7 +1498,7 @@ GitLab
 From 6dfcacae52c3fe994393dfcbea10245d07157212 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 15:35:04 +0100
-Subject: [PATCH 19/36] CST-2328 test containers
+Subject: [PATCH 19/37] CST-2328 test containers
 
 ---
  README.md                                     |  36 +-
@@ -3016,7 +3016,7 @@ GitLab
 From 84bb1dd7f2d7361c19231ac05fa6cc4034bdb376 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 15:35:04 +0100
-Subject: [PATCH 20/36] CST-2328 test containers
+Subject: [PATCH 20/37] CST-2328 test containers
 
 ---
  .../src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java | 7 ++++++-
@@ -3148,7 +3148,7 @@ GitLab
 From 8fef25cf82c6bf10a1bbd53ed9a3d823839f3739 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 13:25:12 +0100
-Subject: [PATCH 21/36] Restore topic-templates resource for
+Subject: [PATCH 21/37] Restore topic-templates resource for
  pre-integration-test image build
 
 ---
@@ -3327,7 +3327,7 @@ GitLab
 From 5c26345c518a6232aa10fa58e9ce826037ef0eb7 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 15:11:33 +0100
-Subject: [PATCH 22/36] Improve Testcontainers failure diagnostics and shutdown
+Subject: [PATCH 22/37] Improve Testcontainers failure diagnostics and shutdown
  handling
 
 ---
@@ -3578,7 +3578,7 @@ GitLab
 From 159494bb198d96a65c2807216c0b14b6666a7152 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 16:00:29 +0100
-Subject: [PATCH 23/36] CST-2328 Improve Testcontainers failure diagnostics and
+Subject: [PATCH 23/37] CST-2328 Improve Testcontainers failure diagnostics and
  shutdown handling
 
 ---
@@ -3693,7 +3693,7 @@ GitLab
 From 524abf86df48d267efd8289c687438dc69ba0318 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 16:11:43 +0100
-Subject: [PATCH 24/36] CST-1993 optimise CI with Testcontainers
+Subject: [PATCH 24/37] CST-1993 optimise CI with Testcontainers
 
 ---
  .drone.star                                   | 175 +++---------------
@@ -4277,7 +4277,7 @@ GitLab
 From 1c4cfabc29d5299c79cd63e291a125d0a653b1c6 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 16:51:16 +0100
-Subject: [PATCH 25/36] CST-2328 fix
+Subject: [PATCH 25/37] CST-2328 fix
 
 ---
  .drone.star | 2 +-
@@ -4303,7 +4303,7 @@ GitLab
 From f8f93ea31564567b1314349d6e5184d7b9fb93ee Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 17:37:21 +0100
-Subject: [PATCH 26/36] CST-2328 fix
+Subject: [PATCH 26/37] CST-2328 fix
 
 ---
  cmd-adaptor-sns-integration-tests/README.md   |  9 +++++
@@ -4465,7 +4465,7 @@ GitLab
 From 7635b7ad32a2d7d777c0bfdaa56cc6242ec8c4f1 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 18:32:54 +0100
-Subject: [PATCH 27/36] CST-2328 fix
+Subject: [PATCH 27/37] CST-2328 fix
 
 ---
  .drone.star                                   |  30 +++-
@@ -4748,7 +4748,7 @@ GitLab
 From c7f91a6c71ee90646e2bb383b2f2cec308c88f33 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 19:18:38 +0100
-Subject: [PATCH 28/36] CST-2328 fix
+Subject: [PATCH 28/37] CST-2328 fix
 
 ---
  .drone.star                               | 2 ++
@@ -4822,7 +4822,7 @@ GitLab
 From e383d4ed61938d7e8f91ef239d5b4571bc382a25 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 19:58:34 +0100
-Subject: [PATCH 29/36] CST-2328 fix
+Subject: [PATCH 29/37] CST-2328 fix
 
 ---
  cmd-adaptor-sns-integration-tests/pom.xml | 2 +-
@@ -4848,7 +4848,7 @@ GitLab
 From 55789869cc0575808159af0d5d389022bdabc62a Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 20:26:43 +0100
-Subject: [PATCH 30/36] CST-2328 fix
+Subject: [PATCH 30/37] CST-2328 fix
 
 ---
  .drone.star | 6 ++++--
@@ -4899,7 +4899,7 @@ GitLab
 From 0de522273da271add4367af9c2528c324b37a015 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 20:55:13 +0100
-Subject: [PATCH 31/36] CST-2328 fix
+Subject: [PATCH 31/37] CST-2328 fix
 
 ---
  .drone.star                               | 4 ++--
@@ -4965,7 +4965,7 @@ GitLab
 From 4beef86f2867962e6ca9b8a1a9f50ab357061928 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 21:21:52 +0100
-Subject: [PATCH 32/36] CST-2328 fix
+Subject: [PATCH 32/37] CST-2328 fix
 
 ---
  .../BuiltImageRuntimeIntegrationTest.java     | 27 +++++++++++++++++++
@@ -5035,7 +5035,7 @@ GitLab
 From c8e9dcc57d0a76427547867c9352c87900549c15 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 21:49:55 +0100
-Subject: [PATCH 33/36] CST-2328 fix
+Subject: [PATCH 33/37] CST-2328 fix
 
 ---
  .drone.star                                      |  2 --
@@ -5110,7 +5110,7 @@ GitLab
 From 8b40325921d9aea48d55674985136c51e849e4f2 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 22:34:18 +0100
-Subject: [PATCH 34/36] CST-2328 fix
+Subject: [PATCH 34/37] CST-2328 fix
 
 ---
  .drone.star                                   |  4 +--
@@ -5276,7 +5276,7 @@ GitLab
 From 57639cc8e0523fd9b41864b3e6cc6b478059796b Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 22:52:16 +0100
-Subject: [PATCH 35/36] CST-2328 remove prototype files
+Subject: [PATCH 35/37] CST-2328 remove prototype files
 
 ---
  .../Dockerfile.layer-order-prototype          |  37 ----
@@ -5685,7 +5685,7 @@ GitLab
 From f019e6d4fc91040593b71fb4dbcc43f684188336 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 22:56:28 +0100
-Subject: [PATCH 36/36] CST-2328 remove prototype files
+Subject: [PATCH 36/37] CST-2328 remove prototype files
 
 ---
  .../BuiltImageRuntimeIntegrationTest.java     | 142 ------------------
@@ -6081,6 +6081,207 @@ index f17e1dde..00000000
 -        }
 -    }
 -}
+-- 
+GitLab
+
+
+From 77559cefb77a8e7f0ee26c9f5ee807b247f730ce Mon Sep 17 00:00:00 2001
+From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
+Date: Mon, 10 Aug 2026 23:10:29 +0100
+Subject: [PATCH 37/37] CST-2328 remove prototype files rollback
+
+---
+ .../BuiltImageRuntimeIntegrationTest.java     | 142 ++++++++++++++++++
+ .../TestcontainersFailureDiagnostics.java     |  31 ++++
+ 2 files changed, 173 insertions(+)
+ create mode 100644 cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/BuiltImageRuntimeIntegrationTest.java
+ create mode 100644 cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/TestcontainersFailureDiagnostics.java
+
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/BuiltImageRuntimeIntegrationTest.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/BuiltImageRuntimeIntegrationTest.java
+new file mode 100644
+index 00000000..956f9a7b
+--- /dev/null
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/BuiltImageRuntimeIntegrationTest.java
+@@ -0,0 +1,142 @@
++package uk.gov.ho.dacc.fdp.testcontainers;
++
++import com.github.dockerjava.api.exception.NotFoundException;
++import org.junit.jupiter.api.AfterAll;
++import org.junit.jupiter.api.BeforeAll;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.testcontainers.DockerClientFactory;
++import org.testcontainers.containers.GenericContainer;
++import org.testcontainers.containers.wait.strategy.Wait;
++import org.testcontainers.utility.DockerImageName;
++
++import java.net.URI;
++import java.net.http.HttpClient;
++import java.net.http.HttpRequest;
++import java.net.http.HttpResponse;
++import java.time.Duration;
++
++import static org.junit.jupiter.api.Assertions.assertTrue;
++import static org.junit.jupiter.api.Assertions.fail;
++
++@ExtendWith(TestcontainersFailureDiagnostics.class)
++class BuiltImageRuntimeIntegrationTest {
++    private static final Logger LOG = LoggerFactory.getLogger(BuiltImageRuntimeIntegrationTest.class);
++    private static final String IMAGE_UNDER_TEST =
++            System.getProperty("sns.runtime.image", "docker-compose-command-adaptor:latest");
++    private static final Duration READINESS_TIMEOUT = Duration.ofSeconds(120);
++
++    private static GenericContainer<?> commandAdaptor;
++
++    @BeforeAll
++    static void beforeAll() {
++        ensureDockerImageExists(IMAGE_UNDER_TEST);
++
++        SnsTestcontainersEnvironment.startInfrastructure();
++        commandAdaptor = new GenericContainer<>(DockerImageName.parse(IMAGE_UNDER_TEST))
++                .withNetwork(SnsTestcontainersEnvironment.sharedNetwork())
++                .withNetworkAliases("command-adaptor")
++                .withExposedPorts(7112)
++                .withEnv("SPRING_PROFILES_ACTIVE", "docker")
++                .withEnv("FDP_APP_KAFKA_TOPIC_SUFFIX", SnsTestcontainersEnvironment.getTopicSuffix())
++                .withEnv("FDP_KAFKA_BROKER", SnsTestcontainersEnvironment.kafkaInternalBootstrapServers())
++                .withEnv("FDP_KAFKA_SCHEMA_REGISTRY_URL", SnsTestcontainersEnvironment.schemaRegistryInternalUrl())
++                .withEnv("FDP_APP_REDIS_END_POINT", SnsTestcontainersEnvironment.redisInternalHost())
++                .withEnv("FDP_APP_REDIS_PORT", "6379")
++                .withEnv("OTEL_TRACES_EXPORTER", "none")
++                .withEnv("OTEL_METRICS_EXPORTER", "none")
++                .withEnv("OTEL_LOGS_EXPORTER", "none")
++                .waitingFor(Wait.forListeningPort())
++                .withStartupTimeout(READINESS_TIMEOUT);
++
++        try {
++            commandAdaptor.start();
++        } catch (RuntimeException e) {
++            dumpCommandAdaptorLogs("container failed to start");
++            throw e;
++        }
++    }
++
++
++    @AfterAll
++    static void afterAll() {
++        if (commandAdaptor != null && commandAdaptor.isRunning()) {
++            commandAdaptor.stop();
++        }
++    }
++
++    @Test
++    void builtImageBootsAndReachesReadiness() {
++        waitForReady("/actuator/health/readiness");
++        assertTrue(commandAdaptor.isRunning(), "Built image container must remain running after readiness");
++    }
++
++    private static void ensureDockerImageExists(String imageName) {
++        try {
++            DockerClientFactory.instance().client().inspectImageCmd(imageName).exec();
++            LOG.info("Validated local image exists: {}", imageName);
++        } catch (NotFoundException notFound) {
++            throw new IllegalStateException("Required local image not found: " + imageName, notFound);
++        }
++    }
++
++    private static void waitForReady(String readinessPath) {
++        HttpClient client = HttpClient.newHttpClient();
++        long deadline = System.nanoTime() + READINESS_TIMEOUT.toNanos();
++        String readinessUrl = "http://" + commandAdaptor.getHost() + ":" + commandAdaptor.getMappedPort(7112) + readinessPath;
++        String lastFailure = "no successful readiness response";
++
++        while (System.nanoTime() < deadline) {
++            try {
++                HttpRequest request = HttpRequest.newBuilder()
++                        .uri(URI.create(readinessUrl))
++                        .header("Accept", "application/json")
++                        .timeout(Duration.ofSeconds(2))
++                        .GET()
++                        .build();
++                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
++                if (response.statusCode() == 200 && response.body() != null && response.body().contains("\"status\":\"UP\"")) {
++                    LOG.info("Readiness confirmed at {}", readinessUrl);
++                    return;
++                }
++                lastFailure = "status=" + response.statusCode() + " body=" + response.body();
++            } catch (Exception e) {
++                lastFailure = e.toString();
++            }
++
++            if (!commandAdaptor.isRunning()) {
++                dumpCommandAdaptorLogs("container exited before readiness");
++                fail("Built image container exited before readiness. Last readiness failure: " + lastFailure);
++            }
++
++            try {
++                Thread.sleep(1000L);
++            } catch (InterruptedException e) {
++                Thread.currentThread().interrupt();
++                fail("Interrupted while waiting for readiness");
++            }
++        }
++
++        dumpCommandAdaptorLogs("readiness timeout");
++        SnsTestcontainersEnvironment.dumpContainerLogs("image readiness timeout");
++        fail("Readiness did not reach UP within " + READINESS_TIMEOUT.toSeconds() + "s. Last failure: " + lastFailure);
++    }
++
++    private static void dumpCommandAdaptorLogs(String reason) {
++        if (commandAdaptor == null || commandAdaptor.getContainerId() == null) {
++            LOG.error("Built image diagnostics requested ({}), but command-adaptor container was not created", reason);
++            return;
++        }
++        try {
++            LOG.error("Built image diagnostics requested: {}", reason);
++            LOG.error("Built image container state: {}", commandAdaptor.getCurrentContainerInfo().getState());
++            LOG.error("--- command-adaptor container logs begin ---\n{}\n--- command-adaptor container logs end ---",
++                    commandAdaptor.getLogs());
++        } catch (RuntimeException e) {
++            LOG.error("Unable to collect command-adaptor container diagnostics", e);
++        }
++    }
++}
++
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/TestcontainersFailureDiagnostics.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/TestcontainersFailureDiagnostics.java
+new file mode 100644
+index 00000000..f17e1dde
+--- /dev/null
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/TestcontainersFailureDiagnostics.java
+@@ -0,0 +1,31 @@
++package uk.gov.ho.dacc.fdp.testcontainers;
++
++import org.junit.jupiter.api.extension.BeforeAllCallback;
++import org.junit.jupiter.api.extension.ExtensionContext;
++import org.junit.jupiter.api.extension.TestWatcher;
++
++public final class TestcontainersFailureDiagnostics implements BeforeAllCallback, TestWatcher {
++    private static final ExtensionContext.Namespace NAMESPACE =
++            ExtensionContext.Namespace.create(TestcontainersFailureDiagnostics.class);
++    private static final String SUITE_RESOURCE = "sns-testcontainers-suite";
++
++    @Override
++    public void beforeAll(ExtensionContext context) {
++        context.getRoot()
++                .getStore(NAMESPACE)
++                .getOrComputeIfAbsent(SUITE_RESOURCE, key -> new SuiteResource(), SuiteResource.class);
++    }
++
++    @Override
++    public void testFailed(ExtensionContext context, Throwable cause) {
++        SnsTestcontainersEnvironment.dumpContainerLogs(
++                "JUnit test failed: " + context.getDisplayName() + " — " + cause.getMessage());
++    }
++
++    private static final class SuiteResource implements ExtensionContext.Store.CloseableResource {
++        @Override
++        public void close() {
++            SnsTestcontainersEnvironment.shutdown();
++        }
++    }
++}
 -- 
 GitLab
 
