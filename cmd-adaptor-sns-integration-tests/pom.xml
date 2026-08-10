@@ -13,7 +13,7 @@
     <artifactId>cmd-adaptor-sns-integration-testing</artifactId>
 
     <properties>
-        <testcontainers.version>1.19.8</testcontainers.version>
+        <testcontainers.version>1.20.4</testcontainers.version>
         <jedis.version>4.4.3</jedis.version>
         <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
         <sns.testcontainers.enabled>false</sns.testcontainers.enabled>
