@@ -1,0 +1,28 @@
+#############################################################################
+# DO NOT EDIT LOCALLY!!!!!!!
+#
+# WARNING: This file is controlled centrally, any changes made in the command
+# adaptor repository will be overwritten by the RepoSync process.  See
+# https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
+# DO NOT EDIT LOCALLY!!!!!!!
+#############################################################################
+FROM quay.io/ukhomeofficedigital/ileap-java17-mvn:1.3
+
+ENV HOME=/home/ileap
+
+WORKDIR /tmp
+
+RUN apk add aws-cli && aws --version
+
+COPY . /home/ileap
+COPY cmd-adaptor-sns-integration-tests/src/test/resources/settings.xml \
+    /usr/local/etc/settings.xml
+COPY cmd-adaptor-sns-integration-tests/src/test/resources/sut-entrypoint.sh \
+  /usr/local/bin/entrypoint.sh
+
+RUN mkdir -p /home/ileap/.m2 && cp -r /root/.m2 /home/ileap/
+RUN chown -R ileap:ileap /home/ileap
+USER ileap
+WORKDIR /home/ileap
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

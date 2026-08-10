@@ -1,0 +1,29 @@
+spring:
+  data:
+    redis:
+      host: ${FDP_APP_REDIS_END_POINT}
+      port: ${FDP_APP_REDIS_PORT}
+
+app:
+  kafka:
+    bootstrap-servers: ${FDP_KAFKA_BROKER}
+    schema-registry-url: ${FDP_KAFKA_SCHEMA_REGISTRY_URL}
+    stream-threads: ${FDP_KAFKA_STREAM_THREADS}
+  cdlz-kafka:
+    bootstrap-servers: ${FDP_APP_CDL_KAFKA_BROKER}
+    schema-registry-url: ${FDP_APP_CDL_KAFKA_SCHEMA_REGISTRY_URL}
+  topic:
+    cdlz-incoming: ${FDP_CMD_ADAPTOR_INCOMING_TOPIC}
+
+logging:
+  file:
+    path: ${FDP_CMD_ADAPTOR_LOG_DIR:}
+  level:
+    root: ${LOG_LEVEL}
+
+management:
+  endpoints:
+    web:
+      base-path: /${spring.application.name}-${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+      exposure:
+        include: "*"

@@ -1,0 +1,527 @@
+package uk.gov.ho.dacc.fdp.testcontainers;
+
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.builder.Transferable;
+import org.testcontainers.utility.DockerImageName;
+import uk.gov.ho.dacc.fdp.CmdAdaptorApplication;
+
+import java.net.URI;
+import java.net.InetAddress;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+public final class SnsTestcontainersEnvironment {
+    private static final Logger LOG = LoggerFactory.getLogger(SnsTestcontainersEnvironment.class);
+
+    private static final String REDIS_IMAGE = "redis:5.0.6";
+    private static final String KAFKA_IMAGE = "confluentinc/cp-kafka:7.9.7";
+    private static final String ZOOKEEPER_IMAGE = "confluentinc/cp-zookeeper:7.9.7";
+    private static final String SCHEMA_REGISTRY_IMAGE = "confluentinc/cp-schema-registry:7.9.7";
+    private static final String AGGREGATE_IMAGE_BASE = "docker.digital.homeoffice.gov.uk/dacc-aws/fdp-aggregate-";
+    private static final String AGGREGATOR_CORE_VERSION = System.getProperty("aggregator.core.version", "10.3.11");
+    private static final boolean AGGREGATORS_ENABLED =
+            Boolean.parseBoolean(System.getProperty("sns.testcontainers.aggregators.enabled", "false"));
+
+    private static final String KAFKA_ALIAS = "kafka";
+    private static final String ZOOKEEPER_ALIAS = "zookeeper";
+    private static final String REDIS_ALIAS = "redis";
+    private static final String SCHEMA_REGISTRY_ALIAS = "schema-registry";
+
+    private static final Network NETWORK = Network.newNetwork();
+    private static final DockerImageName KAFKA_IMAGE_NAME = DockerImageName.parse(KAFKA_IMAGE)
+            .asCompatibleSubstituteFor("apache/kafka");
+    private static final String KAFKA_INTERNAL_BOOTSTRAP = "PLAINTEXT://" + KAFKA_ALIAS + ":29092";
+    private static final String TOPIC_SUFFIX = "tc" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    private static final String RUN_ID = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    private static final String SHARED_TOPIC_TEMPLATE_RESOURCE = "docker-compose/pre-integration-test/topic-templates.txt";
+
+    private static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
+            .withNetwork(NETWORK)
+            .withNetworkAliases(REDIS_ALIAS)
+            .withExposedPorts(6379)
+            .waitingFor(Wait.forLogMessage(".*Ready to accept connections.*", 1))
+            .withStartupTimeout(Duration.ofSeconds(60));
+
+    private static final GenericContainer<?> ZOOKEEPER = new GenericContainer<>(DockerImageName.parse(ZOOKEEPER_IMAGE))
+            .withNetwork(NETWORK)
+            .withNetworkAliases(ZOOKEEPER_ALIAS)
+            .withEnv("ZOOKEEPER_CLIENT_PORT", "2181")
+            .withEnv("ZOOKEEPER_TICK_TIME", "2000")
+            .withExposedPorts(2181)
+            .waitingFor(Wait.forListeningPort())
+            .withStartupTimeout(Duration.ofSeconds(120));
+
+    private static final GenericContainer<?> KAFKA = new CpKafkaContainer(KAFKA_IMAGE_NAME)
+            .withNetwork(NETWORK)
+            .withNetworkAliases(KAFKA_ALIAS)
+            .withStartupTimeout(Duration.ofSeconds(120));
+
+    private static final GenericContainer<?> SCHEMA_REGISTRY = new GenericContainer<>(DockerImageName.parse(SCHEMA_REGISTRY_IMAGE))
+            .withNetwork(NETWORK)
+            .withNetworkAliases(SCHEMA_REGISTRY_ALIAS)
+            .withExposedPorts(8081)
+            .withEnv("SCHEMA_REGISTRY_HOST_NAME", SCHEMA_REGISTRY_ALIAS)
+            .withEnv("SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS", KAFKA_INTERNAL_BOOTSTRAP)
+            .withEnv("SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL", "NONE")
+            .waitingFor(Wait.forHttp("/subjects").forStatusCode(200))
+            .withStartupTimeout(Duration.ofSeconds(120));
+
+    private static final GenericContainer<?> AGGREGATE_PARTY = aggregateContainer(
+            "party", 7101, 8101, 9011, "party-aggregate");
+    private static final GenericContainer<?> AGGREGATE_OBJECT = aggregateContainer(
+            "object", 7102, 8102, 9012, "object-aggregate");
+    private static final GenericContainer<?> AGGREGATE_LOCATION = aggregateContainer(
+            "location", 7103, 8103, 9013, "location-aggregate");
+    private static final GenericContainer<?> AGGREGATE_EVENT = aggregateContainer(
+            "event", 7104, 8104, 9014, "event-aggregate");
+    private static final GenericContainer<?> AGGREGATE_SERVICE = aggregateContainer(
+            "service", 7105, 8105, 9015, "service-aggregate");
+
+
+    private static volatile boolean infrastructureStarted = false;
+    private static volatile boolean applicationStarted = false;
+    private static volatile RuntimeException infrastructureStartupFailure;
+    private static ConfigurableApplicationContext applicationContext;
+    private static int applicationPort;
+
+    private SnsTestcontainersEnvironment() {
+    }
+
+    public static synchronized void startInfrastructure() {
+        if (infrastructureStarted) {
+            return;
+        }
+        if (infrastructureStartupFailure != null) {
+            throw infrastructureStartupFailure;
+        }
+
+        LOG.info("Starting SNS Testcontainers infrastructure");
+        try {
+            REDIS.start();
+            ZOOKEEPER.start();
+            KAFKA.start();
+            SCHEMA_REGISTRY.start();
+            infrastructureStarted = true;
+
+            createRequiredTopics();
+            validateSchemaRegistryRoundTrip();
+        } catch (RuntimeException e) {
+            infrastructureStarted = false;
+            infrastructureStartupFailure = e;
+            stopAll();
+            throw e;
+        }
+    }
+
+    public static synchronized void startApplication() {
+        if (applicationStarted) {
+            return;
+        }
+
+        startInfrastructure();
+
+        Map<String, Object> props = new HashMap<>();
+        props.put("spring.profiles.active", "int");
+        props.put("spring.data.redis.host", getRedisHost());
+        props.put("spring.data.redis.port", String.valueOf(getRedisPort()));
+
+        props.put("app.kafka.bootstrap-servers", getKafkaBootstrapServers());
+        props.put("app.kafka.schema-registry-url", getSchemaRegistryUrl());
+        props.put("app.kafka.application-id", "fdp-cmd-adaptor-sns-" + TOPIC_SUFFIX);
+        props.put("app.kafka.client-id", "fdp-cmd-adaptor-sns-" + TOPIC_SUFFIX);
+
+        props.put("app.cdlz-kafka.bootstrap-servers", getKafkaBootstrapServers());
+        props.put("app.cdlz-kafka.schema-registry-url", getSchemaRegistryUrl());
+        props.put("app.cdlz-kafka.group-id", "cdlz-sns-" + TOPIC_SUFFIX);
+
+        props.put("app.topic.adaptor-input", "fdp-sns-input");
+        props.put("app.topic.cdlz-incoming", "landing-1");
+        props.put("app.pipeline.kafka-topic-suffix", TOPIC_SUFFIX);
+
+        props.put("app.lookup.eori.cdlz-incoming", "landing-413");
+        props.put("app.lookup.eori.lookup-topic", "fdp-sns-lookup-eori");
+        props.put("app.lookup.eori.application-id", "fdp-sns-lookup-eori-" + TOPIC_SUFFIX);
+        props.put("app.lookup.eori.cdlz-application-id", "fdp-cdlz-sns-lookup-eori-" + TOPIC_SUFFIX);
+
+        // application-int.yml resolves placeholders eagerly; provide env-style keys used there.
+        props.put("FDP_APP_REDIS_END_POINT", getRedisHost());
+        props.put("FDP_APP_REDIS_PORT", String.valueOf(getRedisPort()));
+        props.put("FDP_KAFKA_BROKER", getKafkaBootstrapServers());
+        props.put("FDP_KAFKA_SCHEMA_REGISTRY_URL", getSchemaRegistryUrl());
+        props.put("FDP_KAFKA_STREAM_THREADS", "1");
+        props.put("FDP_APP_CDL_KAFKA_BROKER", getKafkaBootstrapServers());
+        props.put("FDP_APP_CDL_KAFKA_SCHEMA_REGISTRY_URL", getSchemaRegistryUrl());
+        props.put("FDP_CMD_ADAPTOR_INCOMING_TOPIC", "landing-1");
+        props.put("FDP_CMD_ADAPTOR_INCOMING_EORI_TOPIC", "landing-413");
+        props.put("FDP_APP_KAFKA_TOPIC_SUFFIX", TOPIC_SUFFIX);
+        props.put("LOG_LEVEL", "INFO");
+        props.put("management.endpoints.web.base-path", "/actuator");
+
+        try {
+            applicationContext = new SpringApplicationBuilder(CmdAdaptorApplication.class)
+                    .properties(props)
+                    // Command line args have higher precedence than application.yml (which hardcodes 7112).
+                    .run("--server.port=0");
+
+            String configuredPort = applicationContext.getEnvironment().getProperty("local.server.port");
+            if (configuredPort == null) {
+                throw new IllegalStateException("Application started without local.server.port");
+            }
+
+            applicationPort = Integer.parseInt(configuredPort);
+            startAggregatorsIfEnabled();
+            applicationStarted = true;
+
+            LOG.info("Started cmd-adaptor-sns test application on port {}", applicationPort);
+        } catch (RuntimeException e) {
+            if (applicationContext != null) {
+                applicationContext.close();
+                applicationContext = null;
+            }
+            applicationStarted = false;
+            throw e;
+        }
+    }
+
+    public static synchronized void stopAll() {
+        if (applicationContext != null) {
+            applicationContext.close();
+            applicationContext = null;
+            applicationStarted = false;
+        }
+
+        stopContainer(AGGREGATE_SERVICE);
+        stopContainer(AGGREGATE_EVENT);
+        stopContainer(AGGREGATE_LOCATION);
+        stopContainer(AGGREGATE_OBJECT);
+        stopContainer(AGGREGATE_PARTY);
+
+        if (SCHEMA_REGISTRY.isRunning()) {
+            SCHEMA_REGISTRY.stop();
+        }
+        if (KAFKA.isRunning()) {
+            KAFKA.stop();
+        }
+        if (ZOOKEEPER.isRunning()) {
+            ZOOKEEPER.stop();
+        }
+        if (REDIS.isRunning()) {
+            REDIS.stop();
+        }
+        infrastructureStarted = false;
+        if (applicationContext == null) {
+            applicationStarted = false;
+        }
+    }
+
+    public static GenericContainer<?> redisContainer() {
+        startInfrastructure();
+        return REDIS;
+    }
+
+    public static String getRedisHost() {
+        return redisContainer().getHost();
+    }
+
+    public static int getRedisPort() {
+        return redisContainer().getMappedPort(6379);
+    }
+
+    public static String getKafkaBootstrapServers() {
+        startInfrastructure();
+        return kafkaBootstrapServers();
+    }
+
+    public static String getSchemaRegistryUrl() {
+        startInfrastructure();
+        return schemaRegistryUrl();
+    }
+
+    public static String getTopicSuffix() {
+        return TOPIC_SUFFIX;
+    }
+
+    public static String getRunId() {
+        return RUN_ID;
+    }
+
+    public static String getApplicationHost() {
+        startApplication();
+        if (applicationContext != null) {
+            String configuredHost = applicationContext.getEnvironment().getProperty("local.server.address");
+            if (configuredHost != null && !configuredHost.isBlank()) {
+                return configuredHost;
+            }
+        }
+        return InetAddress.getLoopbackAddress().getHostAddress();
+    }
+
+    public static int getApplicationPort() {
+        startApplication();
+        return applicationPort;
+    }
+
+    private static void startAggregatorsIfEnabled() {
+        if (!AGGREGATORS_ENABLED) {
+            return;
+        }
+
+        LOG.info("Starting SNS downstream aggregate containers for snapshot scenarios");
+        startContainer(AGGREGATE_PARTY);
+        waitForAggregateReadiness(AGGREGATE_PARTY, "party");
+
+        startContainer(AGGREGATE_OBJECT);
+        waitForAggregateReadiness(AGGREGATE_OBJECT, "object");
+
+        startContainer(AGGREGATE_LOCATION);
+        waitForAggregateReadiness(AGGREGATE_LOCATION, "location");
+
+        startContainer(AGGREGATE_EVENT);
+        waitForAggregateReadiness(AGGREGATE_EVENT, "event");
+
+        startContainer(AGGREGATE_SERVICE);
+        waitForAggregateReadiness(AGGREGATE_SERVICE, "service");
+    }
+
+    private static void waitForAggregateReadiness(GenericContainer<?> container, String aggregateType) {
+        String host = container.getHost();
+        int port = container.getFirstMappedPort();
+        String profilePath = "/aggregate-" + aggregateType + "-" + TOPIC_SUFFIX + "/health/readiness";
+        String actuatorPath = "/actuator/health/readiness";
+
+        LOG.info("Waiting for aggregate readiness: type={}, host={}, port={}", aggregateType, host, port);
+
+        HttpClient client = HttpClient.newHttpClient();
+        int maxAttempts = 120;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            boolean up = isReadinessUp(client, host, port, profilePath) || isReadinessUp(client, host, port, actuatorPath);
+            if (up) {
+                LOG.info("Aggregate readiness confirmed for {} on attempt {}", aggregateType, attempt);
+                return;
+            }
+
+            try {
+                Thread.sleep(1000L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while waiting for aggregate readiness: " + aggregateType, e);
+            }
+        }
+
+        throw new IllegalStateException("Timed out waiting for aggregate readiness: " + aggregateType);
+    }
+
+    private static boolean isReadinessUp(HttpClient client, String host, int port, String path) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("http://" + host + ":" + port + path))
+                    .header("Accept", "application/json")
+                    .timeout(Duration.ofSeconds(2))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            return response.statusCode() == 200
+                    && response.body() != null
+                    && response.body().contains("\"status\":\"UP\"");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void startContainer(GenericContainer<?> container) {
+        if (!container.isRunning()) {
+            container.start();
+        }
+    }
+
+    private static void stopContainer(GenericContainer<?> container) {
+        if (container.isRunning()) {
+            container.stop();
+        }
+    }
+
+    private static void createRequiredTopics() {
+        Set<String> topicNames = new LinkedHashSet<>(loadSharedTopicTemplates(TOPIC_SUFFIX));
+        topicNames.add("landing-1");
+        topicNames.add("landing-413");
+
+        List<NewTopic> topics = new ArrayList<>();
+        for (String topicName : topicNames) {
+            topics.add(new NewTopic(topicName, 1, (short) 1));
+        }
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("bootstrap.servers", kafkaBootstrapServers());
+
+        try (AdminClient adminClient = AdminClient.create(config)) {
+            adminClient.createTopics(topics).all().get(60, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to create SNS test topics", e);
+        }
+    }
+
+    private static List<String> loadSharedTopicTemplates(String topicSuffix) {
+        InputStream stream = SnsTestcontainersEnvironment.class.getClassLoader()
+                .getResourceAsStream(SHARED_TOPIC_TEMPLATE_RESOURCE);
+        if (stream == null) {
+            throw new IllegalStateException("Missing shared topic template resource: " + SHARED_TOPIC_TEMPLATE_RESOURCE);
+        }
+
+        List<String> topicNames = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                    continue;
+                }
+                topicNames.add(trimmed.replace("{suffix}", topicSuffix));
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read shared topic template resource", e);
+        }
+
+        LOG.info("Loaded {} shared topic templates from {}", topicNames.size(), SHARED_TOPIC_TEMPLATE_RESOURCE);
+        return topicNames;
+    }
+
+    private static void validateSchemaRegistryRoundTrip() {
+        try {
+            HttpClient client = HttpClient.newHttpClient();
+            String subject = "tc-sns-health-" + RUN_ID + "-value";
+            String payload = "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Smoke\\\",\\\"fields\\\":[{\\\"name\\\":\\\"message\\\",\\\"type\\\":\\\"string\\\"}]}\"}";
+            String schemaRegistryUrl = schemaRegistryUrl();
+
+            HttpRequest registerRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(schemaRegistryUrl + "/subjects/" + subject + "/versions"))
+                    .header("Content-Type", "application/vnd.schemaregistry.v1+json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload))
+                    .build();
+            HttpResponse<String> registerResponse = client.send(registerRequest, HttpResponse.BodyHandlers.ofString());
+            if (registerResponse.statusCode() != 200) {
+                throw new IllegalStateException("Schema registration failed: " + registerResponse.body());
+            }
+
+            HttpRequest readRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(schemaRegistryUrl + "/subjects/" + subject + "/versions/latest"))
+                    .GET()
+                    .build();
+            HttpResponse<String> readResponse = client.send(readRequest, HttpResponse.BodyHandlers.ofString());
+            if (readResponse.statusCode() != 200 || !readResponse.body().contains("Smoke")) {
+                throw new IllegalStateException("Schema Registry round trip validation failed");
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("Schema Registry validation failed", e);
+        }
+    }
+
+    private static String kafkaBootstrapServers() {
+        return KAFKA.getHost() + ":" + KAFKA.getMappedPort(9092);
+    }
+
+    private static String schemaRegistryUrl() {
+        return "http://" + SCHEMA_REGISTRY.getHost() + ":" + SCHEMA_REGISTRY.getMappedPort(8081);
+    }
+
+
+    private static GenericContainer<?> aggregateContainer(
+            String aggregateType,
+            int applicationPort,
+            int debugPort,
+            int jmxPort,
+            String otelServiceName) {
+        String jarName = "aggregate-" + aggregateType + ".jar";
+
+        return new GenericContainer<>(DockerImageName.parse(AGGREGATE_IMAGE_BASE + aggregateType + ":" + AGGREGATOR_CORE_VERSION))
+                .withNetwork(NETWORK)
+                // Aggregate services call each other via fixed DNS names like aggregate-party:9101.
+                .withNetworkAliases("aggregate-" + aggregateType, "fdp-aggregate-" + aggregateType)
+                .withCreateContainerCmdModifier(cmd -> cmd.withPlatform("linux/amd64"))
+                .withExposedPorts(applicationPort)
+                .withEnv("SPRING_PROFILES_ACTIVE", "docker")
+                .withEnv("LOG_LEVEL", "INFO")
+                .withEnv("FDP_KAFKA_SCHEMA_REGISTRY_URL", "http://" + SCHEMA_REGISTRY_ALIAS + ":8081")
+                .withEnv("FDP_KAFKA_STREAM_THREADS", "1")
+                .withEnv("FDP_KAFKA_BROKER", KAFKA_ALIAS + ":29092")
+                .withEnv("FDP_APP_KAFKA_TOPIC_SUFFIX", TOPIC_SUFFIX)
+                .withEnv("FDP_APP_REDIS_NODES", REDIS_ALIAS + ":6379")
+                .withEnv("FDP_APP_KAFKA_STREAM_MIN_INSYNC_REPLICAS", "1")
+                .withEnv("FDP_APP_KAFKA_STREAM_REPLICATION_FACTOR", "1")
+                .withEnv("OTEL_SERVICE_NAME", otelServiceName)
+                .withEnv("OTEL_TRACES_EXPORTER", "none")
+                .withEnv("OTEL_METRICS_EXPORTER", "none")
+                .withEnv("OTEL_LOGS_EXPORTER", "none")
+                .withEnv("OTEL_INSTRUMENTATION_KAFKA_CLIENTS_ENABLED", "true")
+                .withCommand(
+                        "java",
+                        "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:" + debugPort,
+                        "-Dcom.sun.management.jmxremote",
+                        "-Dcom.sun.management.jmxremote.port=" + jmxPort,
+                        "-Dcom.sun.management.jmxremote.rmi.port=" + jmxPort,
+                        "-Dcom.sun.management.jmxremote.authenticate=false",
+                        "-Dcom.sun.management.jmxremote.local.only=false",
+                        "-Dcom.sun.management.jmxremote.ssl=false",
+                        "-Djava.rmi.server.hostname=localhost",
+                        "-jar",
+                        "/home/fdpuser/" + jarName)
+                .waitingFor(Wait.forListeningPort())
+                .withStartupTimeout(Duration.ofSeconds(180));
+    }
+
+    private static final class CpKafkaContainer extends GenericContainer<CpKafkaContainer> {
+        private CpKafkaContainer(DockerImageName imageName) {
+            super(imageName);
+            withExposedPorts(9092);
+            withEnv("KAFKA_BROKER_ID", "1");
+            withEnv("KAFKA_ZOOKEEPER_CONNECT", ZOOKEEPER_ALIAS + ":2181");
+            withEnv("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP", "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT");
+            withEnv("KAFKA_INTER_BROKER_LISTENER_NAME", "PLAINTEXT");
+            withEnv("KAFKA_LISTENERS", "PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092");
+            withEnv("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://" + KAFKA_ALIAS + ":29092,PLAINTEXT_HOST://localhost:9092");
+            withEnv("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1");
+            withEnv("KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS", "100");
+            withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "false");
+            withCommand("sh", "-c", "while [ ! -f /testcontainers_start.sh ]; do sleep 0.1; done; bash /testcontainers_start.sh");
+            waitingFor(Wait.forListeningPort());
+        }
+
+        @Override
+        protected void containerIsStarting(com.github.dockerjava.api.command.InspectContainerResponse containerInfo) {
+            String advertisedListeners = "PLAINTEXT://" + KAFKA_ALIAS + ":29092,PLAINTEXT_HOST://"
+                    + getHost() + ":" + getMappedPort(9092);
+
+            String command = "#!/bin/bash\n"
+                    + "export KAFKA_ADVERTISED_LISTENERS='" + advertisedListeners + "'\n"
+                    + "/etc/confluent/docker/run\n";
+
+            copyFileToContainer(Transferable.of(command.getBytes(StandardCharsets.UTF_8), 511),
+                    "/testcontainers_start.sh");
+        }
+    }
+}
+
+

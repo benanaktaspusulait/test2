@@ -1,0 +1,124 @@
+---
+#############################################################################
+# WARNING: This file is controlled via RepoSync, any changes made in the
+# command adaptor repository will be overwritten by the RepoSync process.
+# See https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
+#############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdp-output-adaptor-polev1-{{ .FDP_FEED_NAME }}
+  namespace: {{ .KUBE_NAMESPACE }}  
+  labels:
+    pipeline_name: fdp-{{ .FDP_FEED_NAME }}
+    app: fdp-app
+spec:
+  replicas: {{ .FDP_OUTPUT_ADAPTOR_REPLICAS }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      name: fdp-output-adaptor-polev1-{{ .FDP_FEED_NAME }}
+  template:
+    metadata:
+      labels:
+        name: fdp-output-adaptor-polev1-{{ .FDP_FEED_NAME }}
+        service: fdp-output-adaptor-polev1-{{ .FDP_FEED_NAME }}-svc
+        pipeline_name: fdp-{{ .FDP_FEED_NAME }}
+        app: fdp-app
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7110"
+        prometheus.io/path: "/output-adaptor-polev1-{{ .FDP_FEED_NAME }}/prometheus"
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: "{{ .ARTIFACTORY_SECRET_NAME }}"
+      volumes:
+        - name: app-msk-app-keystore
+          secret:
+            secretName: app-msk-app-keystore
+            defaultMode: 256
+      containers:
+        - name: fdp-output-adaptor-polev1-{{ .FDP_FEED_NAME }}
+          command: ["java", "-jar", "/home/fdpuser/output-adaptor-polev1-exec.jar"]
+          image: docker.digital.homeoffice.gov.uk/dacc-aws/fdp-output-adaptor-polev1:{{ .CORE_TAG }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_OUTPUT_ADAPTOR_MEMORY_MAX }}
+              cpu: {{ .FDP_OUTPUT_ADAPTOR_CPU_MAX }}
+            requests:
+              memory: {{ .FDP_OUTPUT_ADAPTOR_MEMORY_MIN }}
+              cpu: {{ .FDP_OUTPUT_ADAPTOR_CPU_MIN }}
+          volumeMounts:
+            - mountPath: "/home/fdpuser/fdp-msk/"
+              name: app-msk-app-keystore
+              readOnly: true
+          env:
+            - name: _JAVA_OPTIONS
+              value: "-Xms{{ .FDP_OUTPUT_ADAPTOR_JAVA_MEMORY_MIN }} -Xmx{{ .FDP_OUTPUT_ADAPTOR_JAVA_MEMORY_MAX }}"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .SPRING_PROFILES_ACTIVE }}"
+            - name: FDP_KAFKA_STREAM_THREADS
+              value: "{{ .FDP_KAFKA_STREAM_THREADS }}"
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: ENVIRONMENT
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: LOG_LEVEL
+            - name: FDP_KAFKA_BROKER
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+            - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+              value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_MSK_APP_KEYSTORE_PASS
+            - name: FDP_APP_KAFKA_TOPIC_SUFFIX
+              value: {{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}
+            - name: FDP_APP_ADAPTOR_SHORT_NAME
+              value: {{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}
+            - name: FDP_APP_REDIS_NODES
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_APP_REDIS_NODES_KEY_NAME }}"
+            - name: FDP_APP_REDIS_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_APP_REDIS_AUTH_TOKEN_KEY_NAME }}"
+        - name: fdp-jaeger-agent
+          image: 340268328991.dkr.ecr.eu-west-2.amazonaws.com/dacc/jaegertracing/jaeger-agent:stable
+          args: [ "--reporter.grpc.host-port=dns:///fdp-jaeger-collector-svc.{{ .JAEGER_NAMESPACE }}.svc.cluster.local:14250","--reporter.type=grpc","--processor.zipkin-compact.server-queue-size={{ .FDP_SPANS_QUEUE_SIZE }}" ]
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_JAEGER_MEMORY_MAX }}
+              cpu: {{ .FDP_JAEGER_CPU_MAX }}
+            requests:
+              memory: {{ .FDP_JAEGER_MEMORY_MIN }}
+              cpu: {{ .FDP_JAEGER_CPU_MIN }}

@@ -1,0 +1,24 @@
+# DO NOT EDIT LOCALLY!!!!!!!
+# WARNING: This file is controlled centrally, any changes made in the command
+# adaptor umbrella repository will be overwritten by the RepoSync process
+# https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync/
+# DO NOT EDIT LOCALLY!!!!!!!
+
+# contains whitelisted/ignored vulnerabilities for CMD trivy scans
+
+# Envconsul 0.13.2: Critical: Unused Go library, unfixable part of latest Envconsul
+CVE-2024-24790
+# Envconsul 0.13.2: High: Unused Go library, unfixable part of latest Envconsul
+CVE-2023-39325
+# Envconsul 0.13.2: High: Unused Go library, unfixable part of latest Envconsul
+CVE-2023-29403
+# Envconsul 0.13.2: High: Unused Go library, unfixable part of latest Envconsul
+CVE-2023-39325
+# Envconsul 0.13.2: High: Unused Go library, unfixable part of latest Envconsul
+CVE-2023-45283
+# Envconsul 0.13.2: High: Unused Go library, unfixable part of latest Envconsul
+CVE-2023-45288
+# Issue is with envconsul gobinary but we're running the latest released version
+CVE-2023-24538
+# Same as CVE-2023-24538
+CVE-2023-24540

@@ -1,0 +1,1132 @@
+{{ $endOfYamlDoc := "---" }}
+{{- if and (ne .ADAPTOR_NAME "pcdp") (ne .ADAPTOR_NAME "crs") }}
+  {{/*
+  This block of code is for feed with single adaptor deployment.
+  Feed - PCDP and CRS will be deployed with 2 adaptors -
+  1. to attach to the original CDLZ MSK cluster to be able to access to joins topics.
+  2. to connect to the new MSK cluster in CDLZ exclusively to connect to R36 data for PCDP and CRS data to CRS.
+  */}}
+{{if eq .FDP_FEED_NAME "ctp"}}
+  {{/*
+  This block of code is to deploy a Kube Service in front of the CTP adaptor
+  in order to expose its internal API and to provide a suitable netpol.
+  */}}
+#############################################################################
+# WARNING: This file is controlled via RepoSync, any changes made in the
+# command adaptor repository will be overwritten by the RepoSync process.
+# See https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
+#############################################################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-cmd-adaptor-ctp
+spec:
+  selector:
+    app: fdp-app
+    pipeline_name: fdp-ctp
+    service_name: fdp-ctp
+  type: ClusterIP
+  ports:
+    - name: fdp-cmd-adaptor-ctp
+      port: 7112
+      targetPort: 7112
+{{ $endOfYamlDoc }}
+# This policy allows Unadjusted command adaptors to communicate with
+# each other.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ctp-adaptor-comms
+spec:
+  podSelector:
+    matchLabels:
+      service_name: fdp-ctp
+  ingress:
+    - from:
+      - podSelector:
+          matchLabels:
+            service_name: fdp-ctp
+{{end}}
+{{ $endOfYamlDoc }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    pipeline_name: fdp-{{ .FDP_FEED_NAME }}
+    app: fdp-app
+{{if eq .FDP_FEED_NAME "ctp"}}
+    service_name: fdp-ctp
+{{end}}
+  {{if eq .ADAPTOR_NAME "placi"}}
+  name: fdp-cmd-adaptor-{{ .ADAPTOR_NAME }}-{{ .FEED_NAME }}
+  {{else}}
+  name: fdp-cmd-adaptor-{{ .ADAPTOR_NAME }}
+  {{end}}
+  {{if .WORKING_HOURS}}
+  annotations:
+    downscaler/uptime: {{ .WORKING_HOURS }}
+  {{end}}
+spec:
+  replicas: {{ .FDP_CMD_ADAPTOR_REPLICAS }}
+  selector:
+    matchLabels:
+      app: fdp-app
+      pipeline_name: fdp-{{ .ADAPTOR_NAME }}
+{{if eq .FDP_FEED_NAME "ctp"}}
+      service_name: fdp-ctp
+{{end}}
+  template:
+    metadata:
+      labels:
+        app: fdp-app
+        pipeline_name: fdp-{{ .ADAPTOR_NAME }}
+{{if eq .FDP_FEED_NAME "ctp"}}
+        service_name: fdp-ctp
+{{end}}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7112"
+  {{if eq .FDP_FEED_NAME "api"}}
+        prometheus.io/path: "/cmd-adaptor-api-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/prometheus"
+  {{else if eq .ADAPTOR_NAME "roro-tsv-test"}}
+        prometheus.io/path: "/cmd-adaptor-roro-tsv-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/prometheus"
+  {{else if eq .ADAPTOR_NAME "roro-xml-test"}}
+        prometheus.io/path: "/cmd-adaptor-roro-xml-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/prometheus"
+  {{else}}
+        prometheus.io/path: "/cmd-adaptor-{{ .ADAPTOR_NAME }}-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/prometheus"
+  {{end}}
+    spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: "{{ .ARTIFACTORY_SECRET_NAME }}"
+      volumes:
+        - name: app-msk-app-keystore
+          secret:
+            secretName: app-msk-app-keystore
+            defaultMode: 256
+        - name: "{{ .FDP_APP_CDL_MSK_SECRET_NAME }}"
+          secret:
+            secretName: "{{ .FDP_APP_CDL_MSK_SECRET_NAME }}"
+            defaultMode: 256
+      containers:
+      - name: "fdp-cmd-adaptor-{{ .ADAPTOR_NAME }}"
+{{if eq .FDP_FEED_NAME "ctp"}}
+        ports:
+          - containerPort: 7112
+            name: http
+{{end}}
+        env:
+          - name: ADAPTOR_NAME
+            value: "{{ .ADAPTOR_NAME }}"
+          - name: ENVIRONMENT
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: ENVIRONMENT
+  {{if .FDP_APP_CDL_KAFKA_GROUP_ID}}
+          - name: FDP_APP_CDL_KAFKA_GROUP_ID
+            value: {{ .FDP_APP_CDL_KAFKA_GROUP_ID }}
+  {{end}}
+          - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+            value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+          - name: FDP_APP_CDL_MSK_KEYSTORE_PATH
+            value: "{{ .FDP_APP_CDL_MSK_KEYSTORE_PATH }}"
+          - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: FDP_APP_MSK_APP_KEYSTORE_PASS
+          - name: FDP_APP_CDL_MSK_KEYSTORE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ .FDP_APP_CDL_MSK_KEYSTORE_PASS_KEY_NAME }}"
+          - name: FDP_APP_CDL_KAFKA_BROKER
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ .FDP_APP_CDL_KAFKA_BROKER_KEY_NAME }}"
+          - name: FDP_APP_CDL_KAFKA_SCHEMA_REGISTRY_URL
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ .FDP_APP_CDL_KAFKA_SCHEMA_REGISTRY_URL_KEY_NAME }}"
+          - name: FDP_APP_REDIS_NODES
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ .FDP_APP_REDIS_NODES_KEY_NAME }}"
+  {{if eq .ADAPTOR_NAME "bitd"}}
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_1
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC_1 }}"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_2
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC_2 }}"
+  {{else if eq .ADAPTOR_NAME "brp"}}
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IC
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC_IC }}"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_OS
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC_OS }}"
+  {{else if eq .ADAPTOR_NAME "cop"}}
+          - name: FDP_CMD_ADAPTOR_STREAM_CASHEABSILVER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_CERBERUSFEEDBACKGOLD_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_CERBERUSOUTCOMESGOLD_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_CONSIGNMENTDETAILSEABSILVER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_FIREARMSEABSILVER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_ITEMSEABSILVER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_JOURNEYEABSILVER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_NEGATIVEEABSILVER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_PEOPLEEABSILVER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_RECORDBORDEREVENTSILVER_RUN
+            value: "true"
+  {{else if eq .ADAPTOR_NAME "crs"}}
+          - name: FDP_CMD_ADAPTOR_RETRY_DELAY_MULTIPLIER
+            value: "{{ .FDP_CMD_ADAPTOR_RETRY_DELAY_MULTIPLIER }}"
+          - name: FDP_CMD_ADAPTOR_MAX_RETRY_DELAY_TIME
+            value: "{{ .FDP_CMD_ADAPTOR_MAX_RETRY_DELAY_TIME }}"
+  {{else if eq .ADAPTOR_NAME "ctp"}}
+          - name: FDP_APP_CDL_KAFKA_GROUP_ID
+            value: "{{ .FDP_APP_CDL_KAFKA_GROUP_ID }}"
+          - name: FDP_APP_CDL_KAFKA_LOOKUP_GROUP_ID
+            value: "{{ .FDP_APP_CDL_KAFKA_LOOKUP_GROUP_ID }}"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC }}"
+          - name: FDP_CMD_ADAPTOR_LOOKUP_INCOMING_TOPIC
+            value: "{{ .FDP_CMD_ADAPTOR_LOOKUP_INCOMING_TOPIC }}"
+          - name: FDP_CMD_ADAPTOR_TOPIC
+            value: "{{ .FDP_CMD_ADAPTOR_TOPIC }}"
+          - name: FDP_CMD_ADAPTOR_LOOKUP_TOPIC
+            value: "{{ .FDP_CMD_ADAPTOR_LOOKUP_TOPIC }}"
+          - name: FDP_CMD_ADAPTOR_SUSPENSE_GARBAGE_TOPIC
+            value: "{{ .FDP_CMD_ADAPTOR_SUSPENSE_GARBAGE_TOPIC }}"
+          - name: FDP_APP_CTP_RETRY_DELAY_TIME
+            value: "{{ .FDP_APP_CTP_RETRY_DELAY_TIME }}"
+          - name: FDP_APP_CTP_RETRY_PUNCTUATE_INTERVAL
+            value: "{{ .FDP_APP_CTP_RETRY_PUNCTUATE_INTERVAL }}"
+          - name: FDP_APP_CTP_NOT_A_PRODUCT_NAME
+            value: "{{ .FDP_APP_CTP_NOT_A_PRODUCT_NAME }}"
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+  {{else if eq .ADAPTOR_NAME "iabs"}}
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_APPLIC
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC_APPLIC }}"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_BIOG
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC_BIOG }}"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DOCS
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC_DOCS }}"
+  {{else if eq .ADAPTOR_NAME "placi"}}
+          - name: FEED_NAME
+            value: "{{ .FEED_NAME }}"
+          - name: FDP_CMD_ADAPTOR_STREAM_RWANDAIR_RUN
+            value: "{{ .FDP_CMD_ADAPTOR_STREAM_RWANDAIR_RUN }}"
+          - name: FDP_CMD_ADAPTOR_STREAM_SAUDIA_RUN
+            value: "{{ .FDP_CMD_ADAPTOR_STREAM_SAUDIA_RUN }}"
+  {{else if eq .ADAPTOR_NAME "predict"}}
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC }}"
+          - name: FDP_CMD_ADAPTOR_LOGICAL_COUNTER
+            value: "{{ .FDP_CMD_ADAPTOR_LOGICAL_COUNTER }}"
+          - name: FDP_CMD_ADAPTOR_SEPARATOR
+            value: "{{ .FDP_CMD_ADAPTOR_SEPARATOR }}"
+  {{else if eq .ADAPTOR_NAME "pronto"}}
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC }}"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_ENTRY
+            value: landing-146
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_FORM_BASEVISIT
+            value: landing-147
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_FORM_ENCOUNTER
+            value: landing-148
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_FORM_FINGERPRINT
+            value: landing-149
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_FORM_UKVIBF
+            value: landing-535
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SEARCHSTAMP_PERSONCHECK
+            value: landing-150
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_ADDITIONALADDRESS
+            value: landing-151
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_ARREST
+            value: landing-152
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_CASHSEIZURE
+            value: landing-153
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_COMPLIANT
+            value: landing-154
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_CONTACTDETAILS
+            value: landing-155
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_ENTRYPREMISES
+            value: landing-156
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_EXTENDEDPERSON
+            value: landing-157
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_ILLEGALWORKEMPLOYEE
+            value: landing-158
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_ILLEGALWORKEMPLOYER
+            value: landing-159
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_INTERVIEW
+            value: landing-160
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_METHODENTRY
+            value: landing-161
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_MITIGATINGCIRCUMSTANC
+            value: landing-162
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_OPERATION
+            value: landing-163
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_PROPERTYSEARCH
+            value: landing-164
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_RENTLANDLORD
+            value: landing-165
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_RENTTENANT
+            value: landing-166
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_SEARCHSUBJECT
+            value: landing-167
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_SERVED
+            value: landing-168
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_USEOFFORCE
+            value: landing-169
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DDFORM_SR_VOLDEP
+            value: landing-170
+  {{else}}
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC
+            value: "{{ .FDP_CMD_ADAPTOR_INCOMING_TOPIC }}"
+  {{end}}
+          - name: FDP_KAFKA_BROKER
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+          - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+          - name: FDP_KAFKA_STREAM_THREADS
+            value: "{{ .FDP_KAFKA_STREAM_THREADS }}"
+          - name: LOG_LEVEL
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: LOG_LEVEL
+          - name: FDP_KAFKA_SESSION_TIMEOUT_MS
+            value: "{{ .FDP_KAFKA_SESSION_TIMEOUT_MS }}"
+          - name: FDP_KAFKA_POLL_INTERVAL_MS
+            value: "{{ .FDP_KAFKA_POLL_INTERVAL_MS }}"
+          - name: FDP_KAFKA_MAX_POLL_RECORDS
+            value: "{{ .FDP_KAFKA_MAX_POLL_RECORDS }}"
+          - name: FDP_KAFKA_REBALANCE_TIMEOUT_MS
+            value: "{{ .FDP_KAFKA_REBALANCE_TIMEOUT_MS }}"
+          - name: FDP_KAFKA_MAX_REQUEST_SIZE
+            value: "{{ .FDP_KAFKA_MAX_REQUEST_SIZE }}"
+          - name: FDP_KAFKA_TASK_TIMEOUT_MS
+            value: "{{ .FDP_KAFKA_TASK_TIMEOUT_MS }}"
+          - name: SPRING_PROFILES_ACTIVE
+            value: "{{ .SPRING_PROFILES_ACTIVE }}"
+          - name: FDP_APP_KAFKA_TOPIC_SUFFIX
+            value: {{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}
+        image: {{ .IMAGE_URL }}
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+  {{if eq .FDP_FEED_NAME "api"}}
+            path: /cmd-adaptor-api-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/liveness
+  {{else if eq .ADAPTOR_NAME "roro-tsv-test"}}
+            path: /cmd-adaptor-roro-tsv-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/liveness
+  {{else if eq .ADAPTOR_NAME "roro-xml-test"}}
+            path: /cmd-adaptor-roro-xml-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/liveness
+  {{else}}
+            path: /cmd-adaptor-{{ .ADAPTOR_NAME }}-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/liveness
+  {{end}}
+            port: 7112
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+  {{if eq .FDP_FEED_NAME "api"}}
+            path: /cmd-adaptor-api-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/readiness
+  {{else if eq .ADAPTOR_NAME "roro-tsv-test"}}
+            path: /cmd-adaptor-roro-tsv-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/readiness
+  {{else if eq .ADAPTOR_NAME "roro-xml-test"}}
+            path: /cmd-adaptor-roro-xml-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/readiness
+  {{else}}
+            path: /cmd-adaptor-{{ .ADAPTOR_NAME }}-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/readiness
+  {{end}}
+            port: 7112
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: "{{ .FDP_CMD_ADAPTOR_CPU_MAX }}"
+            memory: "{{ .FDP_CMD_ADAPTOR_MEMORY_MAX }}"
+          requests:
+            cpu: "{{ .FDP_CMD_ADAPTOR_CPU_MIN }}"
+            memory: "{{ .FDP_CMD_ADAPTOR_MEMORY_MIN }}"
+        volumeMounts:
+          - mountPath: "/home/fdpuser/fdp-msk/"
+            name: app-msk-app-keystore
+            readOnly: true
+          - mountPath: "{{ .FDP_APP_CDL_MSK_SECRET_MOUNT_PATH }}"
+            name: "{{ .FDP_APP_CDL_MSK_SECRET_NAME }}"
+            readOnly: true
+        securityContext:
+          runAsUser: 1000
+      - name: fdp-jaeger-agent
+        image: 340268328991.dkr.ecr.eu-west-2.amazonaws.com/dacc/jaegertracing/jaeger-agent:stable
+        args: [ "--reporter.grpc.host-port=dns:///fdp-jaeger-collector-svc.{{ .JAEGER_NAMESPACE }}.svc.cluster.local:14250","--reporter.type=grpc","--processor.zipkin-compact.server-queue-size={{ .FDP_SPANS_QUEUE_SIZE }}" ]
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+        resources:
+          limits:
+            memory: {{ .FDP_JAEGER_MEMORY_MAX }}
+            cpu: {{ .FDP_JAEGER_CPU_MAX }}
+          requests:
+            memory: {{ .FDP_JAEGER_MEMORY_MIN }}
+            cpu: {{ .FDP_JAEGER_CPU_MIN }}
+  {{/* End of the template for any non-PCDP adaptor. */}}
+{{else}}
+{{/*
+   This block is specifically for deploying two PCDP/CRS adaptors.
+   The two adaptors are joins and "r36" for PCDP/"crs" for CRS ( -> Adaptor2).
+   Both are deployed with the identical config with the exception of the
+   feature switches which will be switched on or off depending on the adaptor type.
+   */}}
+
+  {{range split "joins,adaptor2" ","}}
+  {{/* Iterate over a list containing "joins" and adaptor2 -> "r36"/"crs" elements. */}}
+{{ $endOfYamlDoc }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    pipeline_name: fdp-{{ $.FDP_FEED_NAME }}
+    app: fdp-app
+  {{if and (eq . "joins") (eq $.FDP_FEED_NAME "pcdp")}}
+  name: fdp-cmd-adaptor-{{ $.ADAPTOR_NAME }}-{{ . }}
+  {{else if and (ne . "joins") (eq $.FDP_FEED_NAME "pcdp")}}
+  name: fdp-cmd-adaptor-{{ $.ADAPTOR_NAME }}-r36
+  {{else if and (eq . "joins") (eq $.FDP_FEED_NAME "crs")}}
+  name: fdp-cmd-adaptor-{{ $.ADAPTOR_NAME }}-crs{{ . }}
+  {{else if and (ne . "joins") (eq $.FDP_FEED_NAME "crs")}}
+  name: fdp-cmd-adaptor-{{ $.ADAPTOR_NAME }}-{{ $.FDP_FEED_NAME }}
+  {{end}}
+  {{if $.WORKING_HOURS}}
+  annotations:
+    downscaler/uptime: {{ $.WORKING_HOURS }}
+  {{end}}
+spec:
+  replicas: {{ $.FDP_CMD_ADAPTOR_REPLICAS }}
+  selector:
+    matchLabels:
+      app: fdp-app
+      pipeline_name: fdp-{{ $.ADAPTOR_NAME }}
+  template:
+    metadata:
+      labels:
+        app: fdp-app
+        pipeline_name: fdp-{{ $.ADAPTOR_NAME }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7112"
+        prometheus.io/path: "/cmd-adaptor-{{ $.ADAPTOR_NAME }}-{{ $.FDP_APP_KAFKA_TOPIC_SUFFIX }}/prometheus"
+    spec:
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: "{{ $.ARTIFACTORY_SECRET_NAME }}"
+      volumes:
+        - name: app-msk-app-keystore
+          secret:
+            secretName: app-msk-app-keystore
+            defaultMode: 256
+        - name: "fdp-app-cdl-msk-keystore"
+          secret:
+      {{if eq . "joins"}}
+      {{/* Volumes for joins adaptor. */}}
+            secretName: "fdp-app-cdl-msk-keystore"
+      {{else}}
+      {{/* Volumes for r36/crs adaptor. */}}
+            secretName: "fdp-dbstream-cdl-msk-keystore"
+      {{end}}
+            defaultMode: 256
+      containers:
+      - name: "fdp-cmd-adaptor-{{ $.ADAPTOR_NAME }}"
+        env:
+      {{if and (eq . "joins") (eq $.FDP_FEED_NAME "pcdp") }}
+      {{/* Feed PCDP - Feature switches for joins adaptor. */}}
+          - name: FDP_CMD_ADAPTOR_STREAM_ADDRESS_JOIN_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_ARTEFACT_JOIN_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_ATLAS_ARTEFACT_IDENTITY_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_CID_ARTEFACT_IDENTITY_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_CRS_INGEST_JOIN_ADDRESS_RUN
+            value: "true"
+      {{else if and (ne . "joins") (eq $.FDP_FEED_NAME "pcdp") }}
+      {{/* Feature switches for r36 adaptor. */}}
+          - name: FDP_CMD_ADAPTOR_STREAM_ADDRESS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_ALL_EVENT_ATTRIBUTE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_ASSOCIATION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_ARTEFACT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_BIOGRAPHIC_SET_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_BIOMETRIC_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_CONDITION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_CID_CRS_ALL_EVENT_ATTRIBUTE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_ELECTRONIC_ADDRESS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IDENTITY_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IDENTITY_CONSOLIDATED_PERSON_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_BAIL_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_BARRIER_ACTION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_BORDER_CASEWORK_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CHALLENGE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_CHARTER_FLIGHTS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_CHIEF_CASEWORKING_UNIT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_CLOSE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_CORE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_DECISION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_DETENTION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_ELECTRONIC_MONITORING_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_ENFORCE_ACTIVITY_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_MANAGE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_MARRIAGE_REFERRAL_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_MOVEMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_OFFENCE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_REPORTING_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_RETURNS_REMOVAL_NOTICES_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_TRAVEL_DOCUMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_TRAVEL_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_VOLUNTARY_RETURN_EXPENSE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_IE_VOLUNTARY_RETURN_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_INDIVIDUAL_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_INVOLVEMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_INVOLVEMENT_ADDRESS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_ORGANISATION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_PERSON_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_REFERENCE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_SERVICE_DELIVERY_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_ASYLUM_CLAIM_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_ASYLUM_SUPPORT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_BRITISH_NATIONAL_OVERSEAS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_CARD_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_CORE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_ELECTRONIC_TRAVEL_AUTHORISATION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_DESTITUTE_DOMESTIC_VIOLENCE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_ENDORSEMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_EUS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_EXCLUSION_ORDER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_EXEMPT_DIPLOMAT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_FAMILY_HUMAN_RIGHTS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_FAMILY_REUNION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_FEE_WAIVER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_FRONTIER_WORKER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_FURTHER_LEAVE_TO_REMAIN_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_FURTHER_SUBMISSIONS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_GRADUATE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_HIGH_POTENTIAL_INDIVIDUAL_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_HOME_OFFICE_TRAVEL_DOCUMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_ADDRESS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_APPEALS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_ARRIVALS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_BARRIERS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_CASES_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_DOCUMENTS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_EVENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_PERSON_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_NOTES_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_REMOVAL_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_RESTRICTION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CID_INGEST_SPECIAL_CONDITIONS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CRS_INGEST_EVENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_CROSS_DOMAIN_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_DENORMALISED_EVENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_DOCUMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_REPEATED_ATTRIBUTE_EVENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_RIS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_V4_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IE_V5_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_IMA_LEAVE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_INTERNATIONAL_SPORTSPERSON_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_LOSS_OF_STATUS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_NATIONALITY_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_NO_TIME_LIMIT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_PAYMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_RESETTLEMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_RESTRICTED_LEAVE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_SCALE_UP_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_SETTLEMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_STATELESS_LEAVE_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_STUDY_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_TEMPORARY_WORKER_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_THIRD_COUNTRY_UNIT_IN_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_THIRD_COUNTRY_UNIT_OUT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_TRANSFER_OF_REFUGEE_STATUS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_UKRAINE_SCHEME_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_WINDRUSH_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_WORK_AGE_ASSESSMENT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_WORK_NON_SPONSORED_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_UKVI_WORK_RUN
+            value: "true"
+      {{else if and (eq . "joins") (eq $.FDP_FEED_NAME "crs") }}
+      {{/* Feed CRS - Feature switches for join adaptor. */}}
+          - name: FDP_CMD_ADAPTOR_STREAM_ADDRESSAPPLICATION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_ADDRESSSPONSOR_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_APPLICATION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_APPLICATIONDEPENDANT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_APPLICATIONEVENTNOTES_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_APPLICATIONMINOR_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_APPLICATIONSPONSOR_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_BIODETAILS_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_GROUPAPPLICATIONAPPLICATIONNAMEDPERSON_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_LINKEDAPPLICATION_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_NAMEDPERSON_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_PASSPORT_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_RELATEDPERSON_RUN
+            value: "true"
+          - name: FDP_CMD_ADAPTOR_STREAM_SPONSOR_RUN
+            value: "true"
+      {{else if and (ne . "joins") (eq $.FDP_FEED_NAME "crs") }}
+      {{/* Feed CRS - Feature switches for CRS data adaptor. */}}
+          - name: FDP_CMD_ADAPTOR_STREAM_GROUPAPPLICATION_RUN
+            value: "true"
+      {{end}}
+          - name: ADAPTOR_NAME
+            value: "{{ $.ADAPTOR_NAME }}"
+          - name: ENVIRONMENT
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: ENVIRONMENT
+  {{if $.FDP_APP_CDL_KAFKA_GROUP_ID}}
+          - name: FDP_APP_CDL_KAFKA_GROUP_ID
+            value: {{ $.FDP_APP_CDL_KAFKA_GROUP_ID }}
+  {{end}}
+          - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+            value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+          - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: FDP_APP_MSK_APP_KEYSTORE_PASS
+
+      {{if eq . "joins"}}
+      {{/* CDLZ Connection parameters for joins. */}}
+          - name: FDP_APP_CDL_MSK_KEYSTORE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ $.FDP_APP_CDL_MSK_KEYSTORE_PASS_KEY_NAME }}"
+          - name: FDP_APP_CDL_KAFKA_BROKER
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ $.FDP_APP_CDL_KAFKA_BROKER_KEY_NAME }}"
+          - name: FDP_APP_CDL_KAFKA_SCHEMA_REGISTRY_URL
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ $.FDP_APP_CDL_KAFKA_SCHEMA_REGISTRY_URL_KEY_NAME }}"
+          - name: FDP_APP_CDL_MSK_KEYSTORE_PATH
+            value: "{{ $.FDP_APP_CDL_MSK_KEYSTORE_PATH }}"
+      {{else}}
+      {{/* CDLZ MSK connection parameters for r36 adaptor. */}}
+          - name: FDP_APP_CDL_MSK_KEYSTORE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "FDP_DBSTREAM_CDL_MSK_KEYSTORE_PASS"
+          - name: FDP_APP_CDL_KAFKA_BROKER
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "FDP_DBSTREAM_CDL_KAFKA_BROKER"
+          - name: FDP_APP_CDL_KAFKA_SCHEMA_REGISTRY_URL
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "FDP_DBSTREAM_CDL_KAFKA_SCHEMA_REGISTRY_URL"
+          - name: FDP_APP_CDL_MSK_KEYSTORE_PATH
+            value: "/home/fdpuser/fdp-app-cdl-msk/fdp-dbstream-cdl-msk.jks"
+      {{end}}
+
+          - name: FDP_APP_REDIS_NODES
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ $.FDP_APP_REDIS_NODES_KEY_NAME }}"
+          - name: FDP_APP_REDIS_AUTH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ $.FDP_APP_REDIS_AUTH_TOKEN_KEY_NAME }}"
+      {{if eq $.FDP_FEED_NAME "pcdp" }}
+      {{/* Feed PCDP */}}
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ADDRESS
+            value: "input-pcdpr36.pmi_r36.address"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ADDRESS_JOIN
+            value: "landing-839"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ALL_EVENT_ATTRIBUTE
+            value: "input-pcdpr36.pmi_r36.all_event_attribute"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ARTEFACT
+            value: "input-pcdpr36.pmi_r36.artefact"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ARTEFACT_JOIN
+            value: "landing-838"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ATLAS_ARTEFACT_IDENTITY
+            value: "landing-864"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_BIOMETRIC
+            value: "input-pcdpr36.pmi_r36.biometric"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_BIOGRAPHIC_SET
+            value: "input-pcdpr36.pmi_r36.biographic_set"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_CID_ARTEFACT_IDENTITY
+            value: "landing-863"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_CID_CRS_ALL_EVENT_ATTRIBUTE
+            value: "input-pcdpr36.pmi_r36.cid_crs_all_event_attribute"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ASSOCIATION
+            value: "input-pcdpr36.pmi_r36.association"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_CONDITION
+            value: "input-pcdpr36.pmi_r36.condition"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_CRS_INGEST_JOIN_ADDRESS
+            value: "landing-865"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ELECTRONIC_ADDRESS
+            value: "input-pcdpr36.pmi_r36.involvement_electronic_address"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IDENTITY
+            value: "input-pcdpr36.pmi_r36.identity"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IDENTITY_CONSOLIDATED_PERSON
+            value: "input-pcdpr36.pmi_r36.identity_consolidated_person"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_BAIL
+            value: "input-pcdpr36.pmi_r36.ie_bail_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_BARRIER_ACTION
+            value: "input-pcdpr36.pmi_r36.ie_barrier_action_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_BORDER_CASEWORK
+            value: "input-pcdpr36.pmi_r36.ie_border_casework_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_CHARTER_FLIGHTS
+            value: "input-pcdpr36.pmi_r36.ie_charter_flights_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_CHIEF_CASEWORKING_UNIT
+            value: "input-pcdpr36.pmi_r36.ie_chief_caseworking_unit_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_CLOSE
+            value: "input-pcdpr36.pmi_r36.ie_close_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_CORE
+            value: "input-pcdpr36.pmi_r36.ie_core_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_DECISION
+            value: "input-pcdpr36.pmi_r36.ie_decision_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_DETENTION
+            value: "input-pcdpr36.pmi_r36.ie_detention_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_ELECTRONIC_MONITORING
+            value: "input-pcdpr36.pmi_r36.ie_electronic_monitoring_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_ENFORCE_ACTIVITY
+            value: "input-pcdpr36.pmi_r36.ie_enforce_activity_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_MARRIAGE_REFERRAL
+            value: "input-pcdpr36.pmi_r36.ie_marriage_referral_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_MOVEMENT
+            value: "input-pcdpr36.pmi_r36.ie_movement_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_OFFENCE
+            value: "input-pcdpr36.pmi_r36.ie_offence_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_REPORTING
+            value: "input-pcdpr36.pmi_r36.ie_reporting_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_RETURNS_REMOVAL_NOTICES
+            value: "input-pcdpr36.pmi_r36.ie_returns_removal_notices_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_TRAVEL
+            value: "input-pcdpr36.pmi_r36.ie_travel_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_TRAVEL_DOCUMENT
+            value: "input-pcdpr36.pmi_r36.ie_travel_document_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_VOLUNTARY_RETURN
+            value: "input-pcdpr36.pmi_r36.ie_voluntary_return_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_IE_VOLUNTARY_RETURN_EXPENSE
+            value: "input-pcdpr36.pmi_r36.ie_voluntary_return_expense_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_INDIVIDUAL
+            value: "input-pcdpr36.pmi_r36.individual"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_INVOLVEMENT
+            value: "input-pcdpr36.pmi_r36.involvement"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_INVOLVEMENT_ADDRESS
+            value: "input-pcdpr36.pmi_r36.involvement_address"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ORGANISATION
+            value: "input-pcdpr36.pmi_r36.organisation"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_PERSON
+            value: "input-pcdpr36.pmi_r36.person"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_REFERENCE
+            value: "input-pcdpr36.pmi_r36.reference"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_SERVICE_DELIVERY
+            value: "input-pcdpr36.pmi_r36.service_delivery"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_ASYLUM_CLAIM
+            value: "input-pcdpr36.pmi_r36.ukvi_asylum_claim_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_ASYLUM_SUPPORT
+            value: "input-pcdpr36.pmi_r36.ukvi_asylum_support_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_BRITISH_NATIONAL_OVERSEAS
+            value: "input-pcdpr36.pmi_r36.ukvi_british_national_overseas_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_CARD
+            value: "input-pcdpr36.pmi_r36.ukvi_card_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_CORE
+            value: "input-pcdpr36.pmi_r36.ukvi_core_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_DESTITUTE_DOMESTIC_VIOLENCE
+            value: "input-pcdpr36.pmi_r36.ukvi_destitute_domestic_violence_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_ENDORSEMENT
+            value: "input-pcdpr36.pmi_r36.ukvi_endorsement_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_ELECTRONIC_TRAVEL_AUTHORISATION
+            value: "input-pcdpr36.pmi_r36.ukvi_electronic_travel_authorisation_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_EUS
+            value: "input-pcdpr36.pmi_r36.ukvi_eus_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_EXCLUSION_ORDER
+            value: "input-pcdpr36.pmi_r36.ukvi_exclusion_order_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_EXEMPT_DIPLOMAT
+            value: "input-pcdpr36.pmi_r36.ukvi_exempt_diplomat_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_FAMILY_HUMAN_RIGHTS
+            value: "input-pcdpr36.pmi_r36.ukvi_family_human_rights_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_FAMILY_REUNION
+            value: "input-pcdpr36.pmi_r36.ukvi_family_reunion_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_FEE_WAIVER
+            value: "input-pcdpr36.pmi_r36.ukvi_fee_waiver_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_FRONTIER_WORKER
+            value: "input-pcdpr36.pmi_r36.ukvi_frontier_worker_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_FURTHER_LEAVE_TO_REMAIN
+            value: "input-pcdpr36.pmi_r36.ukvi_further_leave_to_remain_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_FURTHER_SUBMISSIONS
+            value: "input-pcdpr36.pmi_r36.ukvi_further_submissions_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_GRADUATE
+            value: "input-pcdpr36.pmi_r36.ukvi_graduate_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_HIGH_POTENTIAL_INDIVIDUAL_EVENT
+            value: "input-pcdpr36.pmi_r36.ukvi_high_potential_individual_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_HOME_OFFICE_TRAVEL_DOCUMENT_EVENT
+            value: "input-pcdpr36.pmi_r36.ukvi_home_office_travel_document_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CHALLENGE
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_challenge_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_ADDRESS
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_address_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_APPEALS
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_appeals_judicial_review_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_ARRIVALS
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_arrivals_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_BARRIERS
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_barriers_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_CASES
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_cases_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_DOCUMENTS
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_documents_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_EVENT
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_PERSON
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_person_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_NOTES
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_notes_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_REMOVAL
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_removal_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_RESTRICTION
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_restriction_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CID_INGEST_SPECIAL_CONDITIONS
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cid_ingest_special_conditions_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CROSS_DOMAIN
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cross_domain_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CRS_INGEST_EVENT
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_crs_ingest_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_CROSS_DOMAIN
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_cross_domain_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_DENORMALISED_EVENT
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_denormalised_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_DOCUMENT
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_document_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_MANAGE
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_manage_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_RIS
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_ris_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_REPEATED_ATTRIBUTE_EVENT
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_repeated_attribute_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_V4
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_v4_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IE_V5
+            value: "input-pcdpr36.pmi_r36.ukvi_ie_v5_event"
+          - name : FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_IMA_LEAVE
+            value: "input-pcdpr36.pmi_r36.ukvi_ima_leave_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_INTERNATIONAL_SPORTSPERSON
+            value: "input-pcdpr36.pmi_r36.ukvi_international_sportsperson_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_LOSS_OF_STATUS
+            value: "input-pcdpr36.pmi_r36.ukvi_loss_of_status_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_NATIONALITY
+            value: "input-pcdpr36.pmi_r36.ukvi_nationality_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_NO_TIME_LIMIT
+            value: "input-pcdpr36.pmi_r36.ukvi_no_time_limit_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_PAYMENT
+            value: "input-pcdpr36.pmi_r36.ukvi_payment_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_RESETTLEMENT
+            value: "input-pcdpr36.pmi_r36.ukvi_resettlement_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_RESTRICTED_LEAVE
+            value: "input-pcdpr36.pmi_r36.ukvi_restricted_leave_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_SCALE_UP
+            value: "input-pcdpr36.pmi_r36.ukvi_scale_up_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_SETTLEMENT
+            value: "input-pcdpr36.pmi_r36.ukvi_settlement_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_STATELESS_LEAVE
+            value: "input-pcdpr36.pmi_r36.ukvi_stateless_leave_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_STUDY
+            value: "input-pcdpr36.pmi_r36.ukvi_study_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_TEMPORARY_WORKER
+            value: "input-pcdpr36.pmi_r36.ukvi_temporary_worker_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_THIRD_COUNTRY_UNIT_IN
+            value: "input-pcdpr36.pmi_r36.ukvi_third_country_unit_in_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_THIRD_COUNTRY_UNIT_OUT
+            value: "input-pcdpr36.pmi_r36.ukvi_third_country_unit_out_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_TRANSFER_OF_REFUGEE_STATUS
+            value: "input-pcdpr36.pmi_r36.ukvi_transfer_of_refugee_status_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_UKRAINE_SCHEME_EVENT
+            value: "input-pcdpr36.pmi_r36.ukvi_ukraine_scheme_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_WINDRUSH
+            value: "input-pcdpr36.pmi_r36.ukvi_windrush_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_WORK
+            value: "input-pcdpr36.pmi_r36.ukvi_work_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_WORK_AGE_ASSESSMENT
+            value: "input-pcdpr36.pmi_r36.ukvi_age_assessment_event"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_UKVI_WORK_NON_SPONSORED
+            value: "input-pcdpr36.pmi_r36.ukvi_work_non_sponsored_event"
+      {{else if eq $.FDP_FEED_NAME "crs" }}
+      {{/* Feed CRS */}}
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ADDRESSAPPLICATION
+            value: "landing-1021"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_ADDRESSSPONSOR
+            value: "landing-1025"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_APPLICATION
+            value: "landing-1031"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_APPLICATIONDEPENDANT
+            value: "landing-1030"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_APPLICATIONEVENTNOTES
+            value: "landing-1032"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_APPLICATIONMINOR
+            value: "landing-1024"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_APPLICATIONSPONSOR
+            value: "landing-1026"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_BIODETAILS
+            value: "landing-1023"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_GROUPAPPLICATION
+            value: "input-crsv2.crs_v2.groupapplication"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_GROUPAPPLICATIONAPPLICATIONNAMEDPERSON
+            value: "landing-1020"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_LINKEDAPPLICATION
+            value: "landing-1019"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_NAMEDPERSON
+            value: "landing-1027"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_PASSPORT
+            value: "landing-1028"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_RELATEDPERSON
+            value: "landing-1022"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_SPONSOR
+            value: "landing-1029"
+      {{else if eq $.FDP_FEED_NAME "dvla" }}
+      {{/* Feed DVLA */}}
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_REGISTRATION
+            value: "landing-dvla-trailer-registration_0"
+          - name: FDP_CMD_ADAPTOR_INCOMING_TOPIC_DISPOSAL
+            value: "landing-dvla-trailer-disposal_0"
+      {{end}}
+          - name: FDP_KAFKA_BROKER
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: "{{ $.FDP_KAFKA_BROKER_KEY_NAME }}"
+          - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+          - name: FDP_KAFKA_STREAM_THREADS
+            value: "{{ $.FDP_KAFKA_STREAM_THREADS }}"
+          - name: FDP_KAFKA_SESSION_TIMEOUT_MS
+            value: "{{ $.FDP_KAFKA_SESSION_TIMEOUT_MS }}"
+          - name: FDP_KAFKA_POLL_INTERVAL_MS
+            value: "{{ $.FDP_KAFKA_POLL_INTERVAL_MS }}"
+          - name: FDP_KAFKA_MAX_POLL_RECORDS
+            value: "{{ $.FDP_KAFKA_MAX_POLL_RECORDS }}"
+          - name: FDP_KAFKA_REBALANCE_TIMEOUT_MS
+            value: "{{ $.FDP_KAFKA_REBALANCE_TIMEOUT_MS }}"
+          - name: FDP_KAFKA_MAX_REQUEST_SIZE
+            value: "{{ $.FDP_KAFKA_MAX_REQUEST_SIZE }}"
+          - name: FDP_KAFKA_TASK_TIMEOUT_MS
+            value: "{{ $.FDP_KAFKA_TASK_TIMEOUT_MS }}"
+          - name: LOG_LEVEL
+            valueFrom:
+              secretKeyRef:
+                name: environment
+                key: LOG_LEVEL
+          - name: SPRING_PROFILES_ACTIVE
+            value: "{{ $.SPRING_PROFILES_ACTIVE }}"
+          - name: FDP_APP_KAFKA_TOPIC_SUFFIX
+            value: {{ $.FDP_APP_KAFKA_TOPIC_SUFFIX }}
+        image: {{ $.IMAGE_URL }}
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /cmd-adaptor-{{ $.ADAPTOR_NAME }}-{{ $.FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/liveness
+            port: 7112
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /cmd-adaptor-{{ $.ADAPTOR_NAME }}-{{ $.FDP_APP_KAFKA_TOPIC_SUFFIX }}/health/readiness
+            port: 7112
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: "{{ $.FDP_CMD_ADAPTOR_CPU_MAX }}"
+            memory: "{{ $.FDP_CMD_ADAPTOR_MEMORY_MAX }}"
+          requests:
+            cpu: "{{ $.FDP_CMD_ADAPTOR_CPU_MIN }}"
+            memory: "{{ $.FDP_CMD_ADAPTOR_MEMORY_MIN }}"
+        volumeMounts:
+          - mountPath: "/home/fdpuser/fdp-msk/"
+            name: app-msk-app-keystore
+            readOnly: true
+          - mountPath: "/home/fdpuser/fdp-app-cdl-msk/"
+            name: "fdp-app-cdl-msk-keystore"
+            readOnly: true
+        securityContext:
+          runAsUser: 1000
+      - name: fdp-jaeger-agent
+        image: 340268328991.dkr.ecr.eu-west-2.amazonaws.com/dacc/jaegertracing/jaeger-agent:stable
+        args: [ "--reporter.grpc.host-port=dns:///fdp-jaeger-collector-svc.{{ $.JAEGER_NAMESPACE }}.svc.cluster.local:14250","--reporter.type=grpc","--processor.zipkin-compact.server-queue-size={{ $.FDP_SPANS_QUEUE_SIZE }}" ]
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+        resources:
+          limits:
+            memory: {{ $.FDP_JAEGER_MEMORY_MAX }}
+            cpu: {{ $.FDP_JAEGER_CPU_MAX }}
+          requests:
+            memory: {{ $.FDP_JAEGER_MEMORY_MIN }}
+            cpu: {{ $.FDP_JAEGER_CPU_MIN }}
+  {{end}}
+{{end}}

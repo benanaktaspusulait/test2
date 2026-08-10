@@ -1,0 +1,60 @@
+---
+#############################################################################
+# WARNING: This file is controlled via RepoSync, any changes made in the
+# command adaptor repository will be overwritten by the RepoSync process.
+# See https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
+#############################################################################
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: "{{ .ADAPTOR_NAME }}"
+  name: "{{ .ADAPTOR_NAME }}-e2e-test"
+spec:
+  template:
+    metadata:
+      labels:
+        app: fdp-app
+        pipeline-name: "{{ .ADAPTOR_NAME }}-e2e-test"
+    spec:
+      containers:
+      - name: {{ .ADAPTOR_NAME }}-e2e-test
+        env:
+          - name: ADAPTOR_NAME
+            value: "{{ .ADAPTOR_NAME }}"
+          - name: ARTIFACTORY_USERNAME
+            value: "{{ .ARTIFACTORY_USERNAME }}"
+          - name: ARTIFACTORY_PASSWORD
+            value: "{{ .ARTIFACTORY_PASSWORD }}"
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: "{{ .FAILSAFE_REPORT_S3_BUCKET }}"
+                key: access_key_id
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: "{{ .FAILSAFE_REPORT_S3_BUCKET }}"
+                key: secret_access_key
+          - name: KMS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: {{ .FAILSAFE_REPORT_S3_BUCKET }}
+                key: kms_key_id
+          - name: KUBE_NAMESPACE
+            value: "{{ .KUBE_NAMESPACE }}"
+          - name: S3_BUCKET
+            value: "{{ .FAILSAFE_REPORT_S3_BUCKET }}"
+        image: {{ .E2E_TEST_IMAGE_URL }}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: "2048Mi"
+          requests:
+            memory: "1024Mi"
+      restartPolicy: Never
+      securityContext:
+        runAsUser: 1000
+      imagePullSecrets:
+        - name: "{{ .ARTIFACTORY_SECRET_NAME }}"
+  backoffLimit: 1

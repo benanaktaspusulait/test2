@@ -1,0 +1,39 @@
+{{ $endOfYamlDoc := "---" }}
+{{ $endOfYamlDoc }}
+#############################################################################
+# WARNING: This file is controlled via RepoSync, any changes made in the
+# command adaptor repository will be overwritten by the RepoSync process.
+# See https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
+#############################################################################
+
+# These two service definitions need to be in place to support GRPC in fdp-apps 9.2.0 upwards.
+# This service deploys as the "top level" and exposes a ClusterIP
+{{if or (eq .KUBE_NAMESPACE "dacc-dde-dev") (eq .KUBE_NAMESPACE "dacc-dde-test")}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-aggregate-{{ .FDP_AGGREGATOR_TYPE }}-{{ .FDP_FEED_NAME }}
+spec:
+  selector:
+    name: fdp-aggregate-{{ .FDP_AGGREGATOR_TYPE }}-{{ .FDP_FEED_NAME }}
+  type: "ClusterIP"
+  ports:
+    - name: aggregate-{{ .FDP_AGGREGATOR_TYPE }}-{{ .FDP_FEED_NAME }}-http-port
+      port: 9101
+      targetPort: 9101
+      protocol: "TCP"
+# The below service deploys per aggregate replica, since we only deploy 1 in dev/test,
+# this is hardcoded to be 'fdp-aggregate-type-feed-0'.
+{{ $endOfYamlDoc }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: fdp-aggregate-{{ .FDP_AGGREGATOR_TYPE }}-{{ .FDP_FEED_NAME }}-0
+  labels:
+    app: fdp-aggregate-{{ .FDP_AGGREGATOR_TYPE }}-{{ .FDP_FEED_NAME }}-0
+spec:
+  selector:
+    statefulset.kubernetes.io/pod-name: fdp-aggregate-{{ .FDP_AGGREGATOR_TYPE }}-{{ .FDP_FEED_NAME }}-0
+  type: "ClusterIP"
+  clusterIP: None
+{{end}}

@@ -1,0 +1,39 @@
+spring:
+  data:
+    redis:
+      cluster:
+        nodes: ${FDP_APP_REDIS_NODES}
+    token: ${FDP_APP_REDIS_AUTH_TOKEN}
+
+app:
+  kafka:
+    bootstrap-servers: ${FDP_KAFKA_BROKER}
+    schema-registry-url: ${FDP_KAFKA_SCHEMA_REGISTRY_URL}
+    stream-threads: ${FDP_KAFKA_STREAM_THREADS}
+    ssl:
+      key-password: ${FDP_APP_MSK_APP_KEYSTORE_PASS}
+      key-store-password: ${FDP_APP_MSK_APP_KEYSTORE_PASS}
+      key-store-location: ${FDP_APP_MSK_APP_KEYSTORE_PATH}
+  cdlz-kafka:
+    bootstrap-servers: ${FDP_APP_CDL_KAFKA_BROKER}
+    schema-registry-url: ${FDP_APP_CDL_KAFKA_SCHEMA_REGISTRY_URL}
+    group-id: ${FDP_APP_CDL_KAFKA_GROUP_ID:cdlz-sns}
+    ssl:
+      key-password: ${FDP_APP_CDL_MSK_KEYSTORE_PASS}
+      key-store-password: ${FDP_APP_CDL_MSK_KEYSTORE_PASS}
+      key-store-location: ${FDP_APP_CDL_MSK_KEYSTORE_PATH}
+  topic:
+    cdlz-incoming: ${FDP_CMD_ADAPTOR_INCOMING_TOPIC}
+
+logging:
+  file:
+    path: ${FDP_CMD_ADAPTOR_SNS_LOG_DIR:}
+  level:
+    root: ${LOG_LEVEL}
+
+management:
+  endpoints:
+    web:
+      base-path: /${spring.application.name}-${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+      exposure:
+        include: "*"

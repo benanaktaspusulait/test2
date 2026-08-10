@@ -1,0 +1,108 @@
+---
+#############################################################################
+# WARNING: This file is controlled via RepoSync, any changes made in the
+# command adaptor repository will be overwritten by the RepoSync process.
+# See https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
+#############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdp-kafkaconnect-s3-polev1-{{ .FDP_FEED_NAME }}
+  namespace: {{ .KUBE_NAMESPACE }}
+  labels:
+    pipeline_name: fdp-kafkaconnect-s3-{{ .FDP_FEED_NAME }}
+    app: fdp-kafkaconnect-s3
+spec:
+  replicas: {{ .FDP_KC_S3_V1_COUNT }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      name: fdp-kafkaconnect-s3-polev1-{{ .FDP_FEED_NAME }}
+  template:
+    metadata:
+      labels:
+        name: fdp-kafkaconnect-s3-polev1-{{ .FDP_FEED_NAME }}
+        service: fdp-kafkaconnect-s3-polev1-{{ .FDP_FEED_NAME }}-svc
+        pipeline_name: fdp-kafkaconnect-s3-{{ .FDP_FEED_NAME }}
+        app: fdp-kafkaconnect-s3
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: "{{ .ARTIFACTORY_SECRET_NAME }}"
+      volumes:
+        - name: fdp-msk-keystore
+          secret:
+            secretName: app-msk-app-keystore
+            defaultMode: 256
+      containers:
+        - name: fdp-kafka-connect-s3-polev1-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}
+          image: docker.digital.homeoffice.gov.uk/dacc-aws/fdp-kafkaconnect-s3:{{ .KC_S3_TAG }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+            requests:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+          volumeMounts:
+            - mountPath: "/home/fdpuser/fdp-msk/"
+              name: fdp-msk-keystore
+              readOnly: true
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: ENVIRONMENT
+            - name: FDP_KAFKA_BROKER
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+            - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            - name: FDP_S3_CONNECTOR_NAME
+              value: kafkaconnect-s3-polev1-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}
+            - name: FDP_S3_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_CONNECT_S3_BUCKET_NAME_POLE_V1
+            - name: FDP_APP_MSK_TOPIC_NAMES
+              value: "fdp_polev1_address_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_contact_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_event_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_location_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_locationvirtual_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_object_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_objectdetail_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_organisation_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_party_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_person_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_relationship_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }},fdp_polev1_service_event_{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+              value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_MSK_APP_KEYSTORE_PASS
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_AWS_SECRET_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_AWS_ACCESS_KEY_ID
+            - name: FDP_APP_MSK_TASKS_MAX
+              value: "{{ .FDP_POLEV1_CONNECT_TASKS }}"
+            - name: FDP_PIPELINE_NAME
+              value: "{{ .FDP_PIPELINE_NAME }}"

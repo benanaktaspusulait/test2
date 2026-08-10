@@ -1,0 +1,30 @@
+{{ $endOfYamlDoc := "---" }}
+{{ $endOfYamlDoc }}
+#############################################################################
+# WARNING: This file is controlled via RepoSync, any changes made in the
+# command adaptor repository will be overwritten by the RepoSync process.
+# See https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
+#############################################################################
+
+# This policy is to support fdp-apps 9.2.0 upwards to allow internal GRPC comms
+# Note: this will only be deployed in dacc-dde-dev and dacc-dde-test.
+{{if or (eq .KUBE_NAMESPACE "dacc-dde-dev") (eq .KUBE_NAMESPACE "dacc-dde-test")}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-{{ .ADAPTOR_NAME }}-pods-internal-comms
+spec:
+  podSelector:
+    matchLabels:
+      pipeline_name: fdp-{{ .ADAPTOR_NAME }}
+  ingress:
+    - from:
+      - podSelector:
+          matchLabels:
+            pipeline_name: fdp-{{ .ADAPTOR_NAME }}
+      ports:
+      - port: 9101
+        protocol: TCP
+  policyTypes:
+  - Ingress
+{{end}}

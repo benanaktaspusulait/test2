@@ -1,0 +1,579 @@
+---
+#############################################################################
+# WARNING: This file is controlled via RepoSync, any changes made in the
+# command adaptor repository will be overwritten by the RepoSync process.
+# See https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
+#############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fdp-kces-to-matching-wash-{{ .FDP_FEED_NAME }}
+  namespace:  {{ .KUBE_NAMESPACE }}
+  labels:
+    pipeline_name: fdp-kces-{{ .FDP_FEED_NAME }}
+    app: fdp-kces
+spec:
+  replicas: {{ .FDP_KC_ES_COUNT }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      name: fdp-kces-to-matching-wash-{{ .FDP_FEED_NAME }}
+  template:
+    metadata:
+      labels:
+        name: fdp-kces-to-matching-wash-{{ .FDP_FEED_NAME }}
+        service: fdp-kces-svc
+        pipeline_name: fdp-kces-{{ .FDP_FEED_NAME }}
+        app: fdp-kces
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: "{{ .ARTIFACTORY_SECRET_NAME }}"
+      volumes:
+        - name: app-msk-app-keystore
+          secret:
+            secretName: app-msk-app-keystore
+            defaultMode: 256
+      containers:
+        - name: fdp-kafka-connect-elasticsearch-to-matching-wash-address
+          image: docker.digital.homeoffice.gov.uk/dacc-aws/fdp-kafkaconnect-elasticsearch:{{ .KC_ES_TAG }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+            requests:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+          volumeMounts:
+            - mountPath: "/home/fdpuser/fdp-msk/"
+              name: app-msk-app-keystore
+              readOnly: true
+          ports:
+            - name: fdp-mch-adr-prt
+              containerPort: 8083
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: ENVIRONMENT
+            - name: FDP_KAFKA_BROKER
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+            - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms1800m -Xmx1800m"
+            - name: FDP_APP_MSK_TOPIC_NAMES
+              value: "to-matching-wash-address-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+              value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_MSK_APP_KEYSTORE_PASS
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_SECRET_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_ACCESS_KEY_ID
+            - name: FDP_ELASTICSEARCH_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTICSEARCH_CONNECTION_URL
+            - name: FDP_APP_KAFKA_LOG_LEVEL
+              value: "ERROR"
+            - name: FDP_APP_MSK_TASKS_MAX
+              value: "6"
+            - name: FDP_MESSAGE_TYPE
+              value: "AVRO"
+            - name: FDP_GROUP_SUFFIX
+              value: "elasticsearch-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_KAFKA_CONNECT_REST_API_PORT
+              value: "8083"
+        - name: fdp-kafka-connect-elasticsearch-to-matching-wash-contact
+          image: docker.digital.homeoffice.gov.uk/dacc-aws/fdp-kafkaconnect-elasticsearch:{{ .KC_ES_TAG }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+            requests:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+          volumeMounts:
+            - mountPath: "/home/fdpuser/fdp-msk/"
+              name: app-msk-app-keystore
+              readOnly: true
+          ports:
+            - name: fdp-mch-adr-prt
+              containerPort: 8084
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: ENVIRONMENT
+            - name: FDP_KAFKA_BROKER
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+            - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms1800m -Xmx1800m"
+            - name: FDP_APP_MSK_TOPIC_NAMES
+              value: "to-matching-wash-contact-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+              value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_MSK_APP_KEYSTORE_PASS
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_SECRET_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_ACCESS_KEY_ID
+            - name: FDP_ELASTICSEARCH_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTICSEARCH_CONNECTION_URL
+            - name: FDP_APP_KAFKA_LOG_LEVEL
+              value: "ERROR"
+            - name: FDP_APP_MSK_TASKS_MAX
+              value: "6"
+            - name: FDP_MESSAGE_TYPE
+              value: "AVRO"
+            - name: FDP_GROUP_SUFFIX
+              value: "elasticsearch-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_KAFKA_CONNECT_REST_API_PORT
+              value: "8084"
+        - name: fdp-kafka-connect-elasticsearch-to-matching-wash-object
+          image: docker.digital.homeoffice.gov.uk/dacc-aws/fdp-kafkaconnect-elasticsearch:{{ .KC_ES_TAG }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+            requests:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+          volumeMounts:
+            - mountPath: "/home/fdpuser/fdp-msk/"
+              name: app-msk-app-keystore
+              readOnly: true
+          ports:
+            - name: fdp-mch-adr-prt
+              containerPort: 8085
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: ENVIRONMENT
+            - name: FDP_KAFKA_BROKER
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+            - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms1800m -Xmx1800m"
+            - name: FDP_APP_MSK_TOPIC_NAMES
+              value: "to-matching-wash-object-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+              value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_MSK_APP_KEYSTORE_PASS
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_SECRET_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_ACCESS_KEY_ID
+            - name: FDP_ELASTICSEARCH_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTICSEARCH_CONNECTION_URL
+            - name: FDP_APP_KAFKA_LOG_LEVEL
+              value: "ERROR"
+            - name: FDP_APP_MSK_TASKS_MAX
+              value: "6"
+            - name: FDP_MESSAGE_TYPE
+              value: "AVRO"
+            - name: FDP_GROUP_SUFFIX
+              value: "elasticsearch-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_KAFKA_CONNECT_REST_API_PORT
+              value: "8085"
+        - name: fdp-kafka-connect-elasticsearch-to-matching-wash-organisation
+          image: docker.digital.homeoffice.gov.uk/dacc-aws/fdp-kafkaconnect-elasticsearch:{{ .KC_ES_TAG }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+            requests:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+          volumeMounts:
+            - mountPath: "/home/fdpuser/fdp-msk/"
+              name: app-msk-app-keystore
+              readOnly: true
+          ports:
+            - name: fdp-mch-adr-prt
+              containerPort: 8086
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: ENVIRONMENT
+            - name: FDP_KAFKA_BROKER
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+            - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms1800m -Xmx1800m"
+            - name: FDP_APP_MSK_TOPIC_NAMES
+              value: "to-matching-wash-organisation-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+              value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_MSK_APP_KEYSTORE_PASS
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_SECRET_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_ACCESS_KEY_ID
+            - name: FDP_ELASTICSEARCH_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTICSEARCH_CONNECTION_URL
+            - name: FDP_APP_KAFKA_LOG_LEVEL
+              value: "ERROR"
+            - name: FDP_APP_MSK_TASKS_MAX
+              value: "6"
+            - name: FDP_MESSAGE_TYPE
+              value: "AVRO"
+            - name: FDP_GROUP_SUFFIX
+              value: "elasticsearch-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_KAFKA_CONNECT_REST_API_PORT
+              value: "8086"
+        - name: fdp-kafka-connect-elasticsearch-to-matching-wash-person
+          image: docker.digital.homeoffice.gov.uk/dacc-aws/fdp-kafkaconnect-elasticsearch:{{ .KC_ES_TAG }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+            requests:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+          volumeMounts:
+            - mountPath: "/home/fdpuser/fdp-msk/"
+              name: app-msk-app-keystore
+              readOnly: true
+          ports:
+            - name: fdp-mch-adr-prt
+              containerPort: 8087
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: ENVIRONMENT
+            - name: FDP_KAFKA_BROKER
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+            - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms1800m -Xmx1800m"
+            - name: FDP_APP_MSK_TOPIC_NAMES
+              value: "to-matching-wash-person-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+              value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_MSK_APP_KEYSTORE_PASS
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_SECRET_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_ACCESS_KEY_ID
+            - name: FDP_ELASTICSEARCH_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTICSEARCH_CONNECTION_URL
+            - name: FDP_APP_KAFKA_LOG_LEVEL
+              value: "ERROR"
+            - name: FDP_APP_MSK_TASKS_MAX
+              value: "6"
+            - name: FDP_MESSAGE_TYPE
+              value: "AVRO"
+            - name: FDP_GROUP_SUFFIX
+              value: "elasticsearch-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_KAFKA_CONNECT_REST_API_PORT
+              value: "8087"
+        - name: fdp-kafka-connect-elasticsearch-to-matching-wash-transport
+          image: docker.digital.homeoffice.gov.uk/dacc-aws/fdp-kafkaconnect-elasticsearch:{{ .KC_ES_TAG }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+            requests:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+          volumeMounts:
+            - mountPath: "/home/fdpuser/fdp-msk/"
+              name: app-msk-app-keystore
+              readOnly: true
+          ports:
+            - name: fdp-mch-adr-prt
+              containerPort: 8088
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: ENVIRONMENT
+            - name: FDP_KAFKA_BROKER
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+            - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms1800m -Xmx1800m"
+            - name: FDP_APP_MSK_TOPIC_NAMES
+              value: "to-matching-wash-transport-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+              value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_MSK_APP_KEYSTORE_PASS
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_SECRET_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_ACCESS_KEY_ID
+            - name: FDP_ELASTICSEARCH_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTICSEARCH_CONNECTION_URL
+            - name: FDP_APP_KAFKA_LOG_LEVEL
+              value: "ERROR"
+            - name: FDP_APP_MSK_TASKS_MAX
+              value: "6"
+            - name: FDP_MESSAGE_TYPE
+              value: "AVRO"
+            - name: FDP_GROUP_SUFFIX
+              value: "elasticsearch-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_KAFKA_CONNECT_REST_API_PORT
+              value: "8088"
+        - name: fdp-kafka-connect-elasticsearch-to-matching-wash-virtual
+          image: docker.digital.homeoffice.gov.uk/dacc-aws/fdp-kafkaconnect-elasticsearch:{{ .KC_ES_TAG }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+          resources:
+            limits:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+            requests:
+              memory: {{ .FDP_KAFKA_CONNECT_MEMORY }}
+              cpu: {{ .FDP_KAFKA_CONNECT_CPU }}
+          volumeMounts:
+            - mountPath: "/home/fdpuser/fdp-msk/"
+              name: app-msk-app-keystore
+              readOnly: true
+          ports:
+            - name: fdp-mch-adr-prt
+              containerPort: 8089
+          env:
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: ENVIRONMENT
+            - name: FDP_KAFKA_BROKER
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: "{{ .FDP_KAFKA_BROKER_KEY_NAME }}"
+            - name: FDP_KAFKA_SCHEMA_REGISTRY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_KAFKA_SCHEMA_REGISTRY_URL
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms1800m -Xmx1800m"
+            - name: FDP_APP_MSK_TOPIC_NAMES
+              value: "to-matching-wash-virtual-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PATH
+              value: "/home/fdpuser/fdp-msk/app-msk-app.jks"
+            - name: FDP_APP_MSK_APP_KEYSTORE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_APP_MSK_APP_KEYSTORE_PASS
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_SECRET_ACCESS_KEY
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTIC_SEARCH_AWS_ACCESS_KEY_ID
+            - name: FDP_ELASTICSEARCH_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: environment
+                  key: FDP_ELASTICSEARCH_CONNECTION_URL
+            - name: FDP_APP_KAFKA_LOG_LEVEL
+              value: "ERROR"
+            - name: FDP_APP_MSK_TASKS_MAX
+              value: "6"
+            - name: FDP_MESSAGE_TYPE
+              value: "AVRO"
+            - name: FDP_GROUP_SUFFIX
+              value: "elasticsearch-{{ .FDP_APP_KAFKA_TOPIC_SUFFIX }}"
+            - name: FDP_KAFKA_CONNECT_REST_API_PORT
+              value: "8089"

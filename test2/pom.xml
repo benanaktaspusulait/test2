@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>uk.gov.ho.dacc.fdp</groupId>
+    <artifactId>fdp-cmd-adaptor-sns</artifactId>
+    <version>2.8.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>fdp-cmd-adaptor-sns</name>
+    <description>FDP Command Adaptor application and integration tests</description>
+
+    <modules>
+        <module>cmd-adaptor-sns-avro</module>
+        <module>cmd-adaptor-sns-common</module>
+        <module>cmd-adaptor-sns-test-common</module>
+        <module>cmd-adaptor-sns</module>
+        <module>cmd-adaptor-sns-integration-tests</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <java.version>17</java.version>
+        <spring-boot-maven-plugin.version>3.5.9</spring-boot-maven-plugin.version> <!-- must match spring version in fdp-bom -->
+        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
+        <fdp-cmd-adaptor-test-common.version>2.4.0</fdp-cmd-adaptor-test-common.version>
+        <fdp-commons.version>5.2.9</fdp-commons.version>
+        <fdp-bom.version>3.2.11</fdp-bom.version>
+        <opentelemetry.version>1.30.0</opentelemetry.version> <!-- must match that in fdp-bom - for use in dockerfile-->
+        <cdlz-avro-schemas.version>1.2.2</cdlz-avro-schemas.version>
+        <cdlz-avro-schemas.eori.version>1.0.0</cdlz-avro-schemas.eori.version>
+        <mapping.version>1.2.20</mapping.version>
+        <mapping.lib.version>3.2.3</mapping.lib.version>
+        <mapping.plugin.version>3.5.3</mapping.plugin.version>
+        <aggregator-core.version>10.3.11</aggregator-core.version>
+        <jacoco.version>0.8.15</jacoco.version>
+        <skip.integration.tests>true</skip.integration.tests>
+        <skip.integration.tests.docker-compose>true</skip.integration.tests.docker-compose>
+        <changelog.version>2.2.11</changelog.version>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.amashchenko.maven.plugin</groupId>
+                <artifactId>gitflow-maven-plugin</artifactId>
+                <version>1.21.0</version>
+                <configuration>
+                    <gitFlowConfig>
+                        <productionBranch>master</productionBranch>
+                        <developmentBranch>develop</developmentBranch>
+                    </gitFlowConfig>
+                    <skipFeatureVersion>true</skipFeatureVersion>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>se.bjurr.gitchangelog</groupId>
+                <artifactId>git-changelog-maven-plugin</artifactId>
+                <version>${changelog.version}</version>
+                <inherited>false</inherited>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.openjdk.nashorn</groupId>
+                        <artifactId>nashorn-core</artifactId>
+                        <version>15.7</version>
+                    </dependency>
+                </dependencies>
+                <executions>
+                    <execution>
+                        <id>GenerateGitChangelog</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>git-changelog</goal>
+                        </goals>
+                        <configuration>
+                            <templateFile>changelog.mustache</templateFile>
+                            <ignoreCommitsIfMessageMatches>^Update versions for release.*|^Update for next development version.*|^(?i)update changelog.*|^Merge tag.*|^(?i)reposync.*|^\*\*reposync.*|^Merge branch.*|^WIP.*|^\[WIP\].*</ignoreCommitsIfMessageMatches>
+                            <file>CHANGELOG.md</file>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>uk.gov.ho.dacc.fdp</groupId>
+                <artifactId>fdp-bom</artifactId>
+                <version>${fdp-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>uk.gov.ho.dacc.fdp</groupId>
+            <artifactId>fdp-commons</artifactId>
+            <version>${fdp-commons.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>uk.gov.ho.dsa.cdl.schemas</groupId>
+            <artifactId>sns-ens</artifactId>
+            <version>${cdlz-avro-schemas.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>uk.gov.ho.dsa.cdl.schemas</groupId>
+            <artifactId>hmrc-eori</artifactId>
+            <version>${cdlz-avro-schemas.eori.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>uk.gov.ho.dacc.fdp</groupId>
+            <artifactId>fdp-cmd-adaptor-test-common</artifactId>
+            <version>${fdp-cmd-adaptor-test-common.version}</version>
+        </dependency>
+    </dependencies>
+
+
+    <repositories>
+        <repository>
+            <id>confluent</id>
+            <url>https://packages.confluent.io/maven/</url>
+        </repository>
+    </repositories>
+</project>

@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: cmd-adaptor-sns
+  redis:
+    host: redis
+    port: 6379
+
+server:
+  port: 7112
+
+management:
+  metrics:
+    enable:
+      kafka: false
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+app:
+  kafka:
+    bootstrap-servers: localhost:1234
+    schema-registry-url: http://dummy
+    application-id: fdp-cmd-adaptor-sns-${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+    client-id: fdp-cmd-adaptor-sns-${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+    state-dir: /tmp/kafka-streams
+    stream-threads: 1
+  cdlz-kafka:
+    bootstrap-servers: localhost:1234
+    schema-registry-url: http://dummy
+    group-id: cdlz-sns
+
+  topic:
+    adaptor-input: fdp-sns-input
+    cdlz-incoming: landing-1
+  pipeline:
+    kafka-topic-suffix: ${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+
+  lookup:
+    eori:
+      cdlz-incoming: landing-413
+      lookup-topic: fdp-sns-lookup-eori
+      cdlz-application-id: fdp-cdlz-sns-lookup-eori
+      application-id: fdp-sns-lookup-eori
+
+build:
+  mapping: ${mapping.version}
+
+otel:
+  service:
+    name: cmd-adaptor-sns
+  traces:
+    exporter: logging
+  metrics:
+    exporter: none
+  logs:
+    exporter: none

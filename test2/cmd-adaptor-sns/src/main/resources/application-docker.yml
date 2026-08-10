@@ -1,0 +1,12 @@
+---
+#############################################################################
+# DO NOT EDIT LOCALLY!!!!!!!
+#
+# WARNING: This file is controlled centrally, any changes made in the command
+# adaptor repository will be overwritten by the RepoSync process.  See
+# https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
+#############################################################################
+app:
+  jaeger:
+    host: jaeger
+    port: 6831

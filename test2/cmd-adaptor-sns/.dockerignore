@@ -1,0 +1,34 @@
+#Source is not needed by the current Dockerfile; Maven builds the JAR before Docker packaging.
+src/
+
+#Exclude generated output by default, but keep the runtime artefacts copied by the Dockerfile.
+target/**
+!target/
+!target/cmd-adaptor-sns-exec.jar
+!target/dependencies/
+!target/dependencies/opentelemetry-javaagent.jar
+
+#Maven wrapper and build metadata are not used by the current Dockerfile.
+.mvn/
+mvnw
+mvnw.cmd
+pom.xml
+
+#IDE / editor
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+#OS files
+.DS_Store
+Thumbs.db
+
+#VCS and local noise
+.git/
+.gitignore
+*.log
+tmp/
+temp/
+.tmp/

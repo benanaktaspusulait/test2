@@ -1,0 +1,2 @@
+export FDP_APP_CDL_KAFKA_GROUP_ID='fdp-sit-cdlz-sns'
+echo "Set FDP_APP_CDL_KAFKA_GROUP_ID to ${FDP_APP_CDL_KAFKA_GROUP_ID}"

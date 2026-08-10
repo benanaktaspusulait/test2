@@ -1,0 +1,103 @@
+spring:
+  application:
+    name: cmd-adaptor-sns
+  data:
+    redis:
+      host: redis
+      port: 6379
+
+server:
+  port: 7112
+
+management:
+  metrics:
+    enable:
+      kafka: true
+  dynatrace:
+    metrics:
+      binders:
+        kafka:
+          enabled: true
+      export:
+        enabled: ${DYNATRACE_METRICS:false}
+        uri: ${DYNATRACE_API_URL}/v2/metrics/ingest
+        api-token: ${FDP_DYNATRACE_INGEST_TOKEN}
+        # Specify uri and api-token here if not using the local OneAgent endpoint.
+        v2:
+          metric-key-prefix: dsa.fdp.${spring.application.name}
+          enrich-with-dynatrace-metadata: true
+          default-dimensions:
+            env: ${DT_RELEASE_STAGE}
+            application: ${spring.application.name}
+            product: ${DT_RELEASE_PRODUCT}
+          use-dynatrace-summary-instruments: true # (default: true)
+          export-meter-metadata: true             # (default: true)
+
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+    diskSpace:
+      enabled: true
+      threshold: 10MB
+  endpoints:
+    enabled-by-default: false # Make endpoints opt-in
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    prometheus:
+      enabled: true
+    web:
+      exposure:
+        include: "*"
+    health:
+      enabled: true
+      group:
+        readiness:
+          include: kafkaReady, kafkaStreamReady, schemaRegistry, readinessState
+        liveness:
+          include: kafkaLive, kafkaStreamLive, schemaRegistry, livenessState
+      probes:
+        enabled: true
+      show-details: always
+
+app:
+  health:
+    kafka-streams:
+      all-streams-must-be-ready: true
+  kafka:
+    bootstrap-servers: kafka:29092
+    schema-registry-url: http://schema-registry:8081
+    application-id: fdp-cmd-adaptor-sns-${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+    client-id: fdp-cmd-adaptor-sns-${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+    state-dir: /tmp/kafka-streams
+    stream-threads: 1
+  cdlz-kafka:
+    bootstrap-servers: kafka:29092
+    schema-registry-url: http://schema-registry:8081
+    group-id: cdlz-sns
+
+  topic:
+    cdlz-incoming: ${FDP_CMD_ADAPTOR_INCOMING_TOPIC:landing-1}
+    adaptor-input: fdp-sns-input
+  pipeline:
+    kafka-topic-suffix: ${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+
+  lookup:
+    eori:
+      cdlz-incoming: ${FDP_CMD_ADAPTOR_INCOMING_EORI_TOPIC:landing-413}
+      lookup-topic: fdp-sns-lookup-eori
+      cdlz-application-id: fdp-cdlz-sns-lookup-eori-${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+      application-id: fdp-sns-lookup-eori-${FDP_APP_KAFKA_TOPIC_SUFFIX:0}
+
+otel:
+  service:
+    name: cmd-adaptor-sns
+  traces:
+    exporter: logging
+  metrics:
+    exporter: none
+  logs:
+    exporter: none

@@ -1,0 +1,148 @@
+| header.recordHash                                                         | 9876543210                                                  |
+| header.dataFeedId                                                         | 1                                                           |
+| header.collectDataFeedTaskId                                              | 2                                                           |
+| header.ingestDataFeedTaskId                                               | 3                                                           |
+| header.collectionDate                                                     | 2022-02-22T22:22:22.222                                     |
+| header.ingestDateTime                                                     | 2022-02-22T22:22:22.222                                     |
+| header.dataFormat                                                         | api parsed test                                             |
+| body.EoriData.SendingDateTime                                             | 2022-01-21T21:21:21.221                                     |
+| body.EoriData.ExtractionType                                              | Download                                                    |
+| body.EoriData.Eoris.Eori.0.TransactionID                                  | 123                                                         |
+| body.EoriData.Eoris.Eori.0.EoriNumber                                     | EORI765                                                     |
+| body.EoriData.Eoris.Eori.0.TraderName                                     | Testing                                                     |
+| body.EoriData.Eoris.Eori.0.Address.StreetAndNumber                        | 5 Test Street                                               |
+| body.EoriData.Eoris.Eori.0.Address.City                                   | Testville                                                   |
+| body.EoriData.Eoris.Eori.0.Address.Postcode                               | TE5 1IN{testId}                                             |
+| body.EoriData.Eoris.Eori.0.DateOfRegistration                             | 2022-01-20                                                  |
+| body.EoriData.Eoris.Eori.0.VatRegistrationNumbers.VatRegistrationNumber.0 | ABC                                                         |
+| body.EoriData.Eoris.Eori.0.VatRegistrationNumbers.VatRegistrationNumber.1 | ZYX                                                         |
+| body.EoriData.Eoris.Eori.0.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.1.TransactionID                                  | 123                                                         |
+| body.EoriData.Eoris.Eori.1.EoriNumber                                     | RepresentativeEori                                          |
+| body.EoriData.Eoris.Eori.1.TraderName                                     | Acme Co                                                     |
+| body.EoriData.Eoris.Eori.1.Address.StreetAndNumber                        | 7 Somewhere Street                                          |
+| body.EoriData.Eoris.Eori.1.Address.City                                   | London                                                      |
+| body.EoriData.Eoris.Eori.1.Address.Postcode                               | NW1 5EX{testId}                                             |
+| body.EoriData.Eoris.Eori.1.DateOfRegistration                             | 2023-01-20                                                  |
+| body.EoriData.Eoris.Eori.1.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT01                                                       |
+| body.EoriData.Eoris.Eori.1.VatRegistrationNumbers.VatRegistrationNumber.1 | VAT02                                                       |
+| body.EoriData.Eoris.Eori.1.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.2.TransactionID                                  | 124                                                         |
+| body.EoriData.Eoris.Eori.2.EoriNumber                                     | partyConsignorEori                                          |
+| body.EoriData.Eoris.Eori.2.TraderName                                     | PartyConsignor                                              |
+| body.EoriData.Eoris.Eori.2.Address.StreetAndNumber                        | 12 Abbey Road                                               |
+| body.EoriData.Eoris.Eori.2.Address.City                                   | London                                                      |
+| body.EoriData.Eoris.Eori.2.Address.Postcode                               | NW1 4AB{testId}                                             |
+| body.EoriData.Eoris.Eori.2.DateOfRegistration                             | 2023-01-20                                                  |
+| body.EoriData.Eoris.Eori.2.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT01                                                       |
+| body.EoriData.Eoris.Eori.2.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.3.TransactionID                                  | 125                                                         |
+| body.EoriData.Eoris.Eori.3.EoriNumber                                     | partyNotifyEori                                             |
+| body.EoriData.Eoris.Eori.3.TraderName                                     | PartyNotify                                                 |
+| body.EoriData.Eoris.Eori.3.Address.StreetAndNumber                        | 10 Downing Street                                           |
+| body.EoriData.Eoris.Eori.3.Address.City                                   | London                                                      |
+| body.EoriData.Eoris.Eori.3.Address.Postcode                               | W1 2EB{testId}                                              |
+| body.EoriData.Eoris.Eori.3.DateOfRegistration                             | 2023-01-20                                                  |
+| body.EoriData.Eoris.Eori.3.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT02                                                       |
+| body.EoriData.Eoris.Eori.3.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.4.TransactionID                                  | 126                                                         |
+| body.EoriData.Eoris.Eori.4.EoriNumber                                     | partyMConsigneeEori                                         |
+| body.EoriData.Eoris.Eori.4.TraderName                                     | partyConsignee                                              |
+| body.EoriData.Eoris.Eori.4.Address.StreetAndNumber                        | 221B Baker Street                                           |
+| body.EoriData.Eoris.Eori.4.Address.City                                   | London                                                      |
+| body.EoriData.Eoris.Eori.4.Address.Postcode                               | NW1 6XE{testId}                                             |
+| body.EoriData.Eoris.Eori.4.DateOfRegistration                             | 2023-01-20                                                  |
+| body.EoriData.Eoris.Eori.4.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT12                                                       |
+| body.EoriData.Eoris.Eori.4.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.5.TransactionID                                  | 127                                                         |
+| body.EoriData.Eoris.Eori.5.EoriNumber                                     | partyDeclarantEori                                          |
+| body.EoriData.Eoris.Eori.5.TraderName                                     | partyDeclarant                                              |
+| body.EoriData.Eoris.Eori.5.Address.StreetAndNumber                        | 1 Savoy Hill                                                |
+| body.EoriData.Eoris.Eori.5.Address.City                                   | London                                                      |
+| body.EoriData.Eoris.Eori.5.Address.Postcode                               | WC2R 0BP{testId}                                            |
+| body.EoriData.Eoris.Eori.5.DateOfRegistration                             | 2023-01-20                                                  |
+| body.EoriData.Eoris.Eori.5.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT22                                                       |
+| body.EoriData.Eoris.Eori.5.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.6.TransactionID                                  | 128                                                         |
+| body.EoriData.Eoris.Eori.6.EoriNumber                                     | partyCNotify0Eori                                           |
+| body.EoriData.Eoris.Eori.6.TraderName                                     | partyCNotify0                                               |
+| body.EoriData.Eoris.Eori.6.Address.StreetAndNumber                        | Great Russell Street                                        |
+| body.EoriData.Eoris.Eori.6.Address.City                                   | London                                                      |
+| body.EoriData.Eoris.Eori.6.Address.Postcode                               | WC1B 3DG{testId}                                            |
+| body.EoriData.Eoris.Eori.6.DateOfRegistration                             | 2023-01-20                                                  |
+| body.EoriData.Eoris.Eori.6.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT31                                                       |
+| body.EoriData.Eoris.Eori.6.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.7.TransactionID                                  | 129                                                         |
+| body.EoriData.Eoris.Eori.7.EoriNumber                                     | partyCNotify1Eori                                           |
+| body.EoriData.Eoris.Eori.7.TraderName                                     | partyCNotify1                                               |
+| body.EoriData.Eoris.Eori.7.Address.StreetAndNumber                        | St Katharine                                                |
+| body.EoriData.Eoris.Eori.7.Address.City                                   | London                                                      |
+| body.EoriData.Eoris.Eori.7.Address.Postcode                               | EC3N 4AB{testId}                                            |
+| body.EoriData.Eoris.Eori.7.DateOfRegistration                             | 2023-01-20                                                  |
+| body.EoriData.Eoris.Eori.7.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT32                                                       |
+| body.EoriData.Eoris.Eori.7.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.8.TransactionID                                  | 130                                                         |
+| body.EoriData.Eoris.Eori.8.EoriNumber                                     | partyCConsignee0Eori                                        |
+| body.EoriData.Eoris.Eori.8.TraderName                                     | partyCConsignee0                                            |
+| body.EoriData.Eoris.Eori.8.Address.StreetAndNumber                        | Castlehill                                                  |
+| body.EoriData.Eoris.Eori.8.Address.City                                   | Edinburgh                                                   |
+| body.EoriData.Eoris.Eori.8.Address.Postcode                               | EH1 2NG{testId}                                             |
+| body.EoriData.Eoris.Eori.8.DateOfRegistration                             | 2023-01-20                                                  |
+| body.EoriData.Eoris.Eori.8.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT41                                                       |
+| body.EoriData.Eoris.Eori.8.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.9.TransactionID                                  | 131                                                         |
+| body.EoriData.Eoris.Eori.9.EoriNumber                                     | partyCConsignee1Eori                                        |
+| body.EoriData.Eoris.Eori.9.TraderName                                     | partyCConsignee1                                            |
+| body.EoriData.Eoris.Eori.9.Address.StreetAndNumber                        | Woodstock                                                   |
+| body.EoriData.Eoris.Eori.9.Address.City                                   | Oxfordshire                                                 |
+| body.EoriData.Eoris.Eori.9.Address.Postcode                               | OX20 1PP{testId}                                            |
+| body.EoriData.Eoris.Eori.9.DateOfRegistration                             | 2023-01-20                                                  |
+| body.EoriData.Eoris.Eori.9.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT42                                                       |
+| body.EoriData.Eoris.Eori.9.PrincipalEconomicActivity                      | Test Stuff                                                  |
+| body.EoriData.Eoris.Eori.10.TransactionID                                  | 132                                                        |
+| body.EoriData.Eoris.Eori.10.EoriNumber                                     | goodsConsignorEori                                         |
+| body.EoriData.Eoris.Eori.10.TraderName                                     | goodsConsignor                                             |
+| body.EoriData.Eoris.Eori.10.Address.StreetAndNumber                        | 12 Abbey Road                                              |
+| body.EoriData.Eoris.Eori.10.Address.City                                   | London                                                     |
+| body.EoriData.Eoris.Eori.10.Address.Postcode                               | NW1 4AB{testId}                                            |
+| body.EoriData.Eoris.Eori.10.DateOfRegistration                             | 2023-01-20                                                 |
+| body.EoriData.Eoris.Eori.10.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT51                                                      |
+| body.EoriData.Eoris.Eori.10.PrincipalEconomicActivity                      | Test Stuff                                                 |
+| body.EoriData.Eoris.Eori.11.TransactionID                                  | 131                                                        |
+| body.EoriData.Eoris.Eori.11.EoriNumber                                     | locationCConsignee2Eori                                    |
+| body.EoriData.Eoris.Eori.11.TraderName                                     | locationCConsignee2                                        |
+| body.EoriData.Eoris.Eori.11.Address.StreetAndNumber                        | Woodstock                                                  |
+| body.EoriData.Eoris.Eori.11.Address.City                                   | Oxfordshire                                                |
+| body.EoriData.Eoris.Eori.11.Address.Postcode                               | OX20 1PP{testId}                                           |
+| body.EoriData.Eoris.Eori.11.DateOfRegistration                             | 2023-01-20                                                 |
+| body.EoriData.Eoris.Eori.11.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT42                                                      |
+| body.EoriData.Eoris.Eori.11.PrincipalEconomicActivity                      | Test Stuff                                                 |
+| body.EoriData.Eoris.Eori.12.TransactionID                                  | 129                                                        |
+| body.EoriData.Eoris.Eori.12.EoriNumber                                     | locationCNotify2Eori                                       |
+| body.EoriData.Eoris.Eori.12.TraderName                                     | locationCNotify2                                           |
+| body.EoriData.Eoris.Eori.12.Address.StreetAndNumber                        | St Katharine                                               |
+| body.EoriData.Eoris.Eori.12.Address.City                                   | London                                                     |
+| body.EoriData.Eoris.Eori.12.Address.Postcode                               | EC3N 4AB{testId}                                           |
+| body.EoriData.Eoris.Eori.12.DateOfRegistration                             | 2023-01-20                                                 |
+| body.EoriData.Eoris.Eori.12.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT32                                                      |
+| body.EoriData.Eoris.Eori.12.PrincipalEconomicActivity                      | Test Stuff                                                 |
+| body.EoriData.Eoris.Eori.13.TransactionID                                  | 130                                                        |
+| body.EoriData.Eoris.Eori.13.EoriNumber                                     | goodsConsignor1Eori                                        |
+| body.EoriData.Eoris.Eori.13.TraderName                                     | Location CShip                                             |
+| body.EoriData.Eoris.Eori.13.Address.StreetAndNumber                        | 8 Somewhere Street                                         |
+| body.EoriData.Eoris.Eori.13.Address.City                                   | London                                                     |
+| body.EoriData.Eoris.Eori.13.Address.Postcode                               | NW1 5EX{testId}                                            |
+| body.EoriData.Eoris.Eori.13.DateOfRegistration                             | 2023-01-20                                                 |
+| body.EoriData.Eoris.Eori.13.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT01                                                      |
+| body.EoriData.Eoris.Eori.13.VatRegistrationNumbers.VatRegistrationNumber.1 | VAT02                                                      |
+| body.EoriData.Eoris.Eori.13.PrincipalEconomicActivity                      | Test Stuff                                                 |
+| body.EoriData.Eoris.Eori.14.TransactionID                                  | 131                                                        |
+| body.EoriData.Eoris.Eori.14.EoriNumber                                     | partiesCarrierEori                                         |
+| body.EoriData.Eoris.Eori.14.TraderName                                     | partiesCarrier                                             |
+| body.EoriData.Eoris.Eori.14.Address.StreetAndNumber                        | 62 Golden Street                                           |
+| body.EoriData.Eoris.Eori.14.Address.City                                   | Milton Keynes                                              |
+| body.EoriData.Eoris.Eori.14.Address.Postcode                               | MK1 3RW{testId}                                            |
+| body.EoriData.Eoris.Eori.14.DateOfRegistration                             | 2023-01-20                                                 |
+| body.EoriData.Eoris.Eori.14.VatRegistrationNumbers.VatRegistrationNumber.0 | VAT21                                                      |
+| body.EoriData.Eoris.Eori.14.VatRegistrationNumbers.VatRegistrationNumber.1 | VAT22                                                      |
+| body.EoriData.Eoris.Eori.14.PrincipalEconomicActivity                      | Test Stuff                                                 |
