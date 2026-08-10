@@ -200,6 +200,7 @@ def ci_pipeline(ctx):
             'image': MAVEN_JAVA17_IMAGE,
             'commands': [
                 '. ./set_drone_secrets.sh',
+                'unset DOCKER_API_VERSION',
                 'export DOCKER_CONFIG=/tmp/testcontainers-docker-config',
                 'mkdir -p "$${DOCKER_CONFIG}"',
                 'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
@@ -256,6 +257,7 @@ def ci_pipeline(ctx):
             'image': MAVEN_JAVA17_IMAGE,
             'commands': [
                 '. ./set_drone_secrets.sh',
+                'unset DOCKER_API_VERSION',
                 'export DOCKER_CONFIG=/tmp/testcontainers-runtime-docker-config',
                 'mkdir -p "$${DOCKER_CONFIG}"',
                 'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',

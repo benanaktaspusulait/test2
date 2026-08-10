@@ -133,7 +133,7 @@
                 <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
                 <sns.testcontainers.expected-scenarios>1</sns.testcontainers.expected-scenarios>
                 <cucumber.filter.tags><![CDATA[@cmd and not @ignore]]></cucumber.filter.tags>
-                <failsafe.excludes>none</failsafe.excludes>
+                <failsafe.excludes>**/BuiltImageRuntimeIntegrationTest</failsafe.excludes>
             </properties>
         </profile>
         <profile>
@@ -147,7 +147,7 @@
                 <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
                 <sns.testcontainers.aggregators.enabled>true</sns.testcontainers.aggregators.enabled>
                 <sns.testcontainers.expected-scenarios>14</sns.testcontainers.expected-scenarios>
-                <failsafe.excludes>none</failsafe.excludes>
+                <failsafe.excludes>**/BuiltImageRuntimeIntegrationTest</failsafe.excludes>
             </properties>
         </profile>
         <profile>
@@ -161,7 +161,7 @@
                 <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
                 <sns.testcontainers.expected-scenarios>1</sns.testcontainers.expected-scenarios>
                 <cucumber.filter.tags><![CDATA[@cmd and not @ignore]]></cucumber.filter.tags>
-                <failsafe.excludes>none</failsafe.excludes>
+                <failsafe.excludes>**/BuiltImageRuntimeIntegrationTest</failsafe.excludes>
             </properties>
         </profile>
         <profile>
@@ -175,7 +175,7 @@
                 <sns.testcontainers.enabled>true</sns.testcontainers.enabled>
                 <sns.testcontainers.aggregators.enabled>true</sns.testcontainers.aggregators.enabled>
                 <sns.testcontainers.expected-scenarios>14</sns.testcontainers.expected-scenarios>
-                <failsafe.excludes>none</failsafe.excludes>
+                <failsafe.excludes>**/BuiltImageRuntimeIntegrationTest</failsafe.excludes>
             </properties>
         </profile>
         <profile>
