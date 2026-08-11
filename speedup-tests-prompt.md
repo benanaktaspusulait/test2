@@ -1,868 +1,405 @@
-Implement a comprehensive test and CI speed optimisation for the SNS repository.
+Fix the current SNS test-speed optimisation patch.
 
-This is an IMPLEMENTATION task.
+This is a focused IMPLEMENTATION task.
 
-Do not create:
-- reports
-- markdown documents
-- proposal files
-- benchmark files
-- TODO files
-- analysis artefacts
-- temporary scripts that remain in the final diff
+Do NOT:
+- create reports
+- create markdown files
+- create TODO files
+- create benchmark artefacts
+- refactor unrelated code
+- change business feature semantics
+- remove test protections
+- weaken assertions
+- touch Docker/image optimisation work outside the exact areas below
 
-Work directly in the existing source, Maven configuration and CI pipeline.
-
-The objective is:
-
-    make the SNS test/build pipeline as fast as reasonably possible
-
-while preserving:
-
-    test correctness
-    all existing business scenarios
-    coverage
-    failure visibility
-    Testcontainers protections
-    built-image validation
-    security scanning
-
-Do not optimise by simply removing validation.
+Keep the current good optimisations unless explicitly told otherwise.
 
 ======================================================================
-0. PROTECT THE CURRENT WORKING STATE
+1. REMOVE READINESS RESULT CACHING FROM SNSSTEPS
    ======================================================================
 
-The repository already contains important Container/CI optimisation work.
+In:
 
-Do NOT break or remove:
+    cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
 
-- .dockerignore optimisation
-- final Dockerfile layer ordering
-- BuildKit / registry cache behaviour
-- Testcontainers-based integration environment
-- Redis
-- Kafka
-- Schema Registry
-- downstream aggregate Testcontainers
-- dynamic topic suffix/isolation
-- real Cucumber business suite
-- expected scenario protection
-- completed scenario protection
-- TestcontainersSuiteCoverageTest
-- Docker availability / false-green protection
-- strict testId correlation
-- validateSchemaRegistryRoundTrip()
-- TestcontainersFailureDiagnostics
-- BuiltImageRuntimeIntegrationTest
-- built-image runtime readiness validation
-- Trivy
-- JaCoCo / coverage gates
-- legacy compose fallback resources where still intentionally retained
+REMOVE:
 
-Do not weaken assertions to gain speed.
+    private static final AtomicBoolean READINESS_CONFIRMED ...
 
-Do not allow:
+and all related logic such as:
 
-    Tests run: 0
-    skipped business suite
-    Docker unavailable -> green build
+    if (READINESS_CONFIRMED.get()) {
+        ...
+        return;
+    }
+
+    READINESS_CONFIRMED.set(true);
+
+    READINESS_CONFIRMED.set(false);
+
+Reason:
+
+The Cucumber step:
+
+    When Readiness health check is completed
+
+must continue to perform a real readiness check each time it is invoked.
+
+Do NOT turn this business/test step into a cached no-op after the first success.
+
+KEEP:
+
+- shared static HttpClient
+- REQUEST_TIMEOUT constant
+- debug-level repeated readiness logging
+- current real HTTP readiness behaviour
+- existing timeout/failure semantics
+
+Do not weaken the readiness check.
 
 ======================================================================
-1. KEEP AND COMPLETE CURRENT LOW-RISK OPTIMISATIONS
+2. FIX RUNLOG BATCH PROCESSING FOR max.poll.records=10
    ======================================================================
 
-Keep the current safe changes:
-
-A. Cucumber output
-
-Remove the Cucumber:
-
-    pretty
-
-plugin.
-
-Keep:
-
-    summary
-    SnsSteps
-    HTML report
-
-Do not change scenario selection.
-
---------------------------------------------------
-
-B. Kafka polling Duration correctness
-
-Keep:
-
-    INITIAL_POLL_DURATION =
-        Duration.ofMillis(INITIAL_POLL_DURATION_MS)
-
-    POLL_DURATION =
-        Duration.ofMillis(POLL_DURATION_MS)
-
-The values named *_MS must be interpreted as milliseconds.
-
-Do NOT reintroduce:
-
-    Duration.ofSeconds(POLL_DURATION_MS)
-
-This is a correctness fix.
-
---------------------------------------------------
-
-C. Remove useless calls
-
-Keep removal of:
-
-    kafkaConsumer.assignment();
-
-where its result is not used.
-
-Search the touched test code for similar obvious no-op calls.
-
-Remove only when behaviour is unquestionably unchanged.
-
---------------------------------------------------
-
-D. Logging
-
-Change high-frequency successful polling/retry logging from INFO to DEBUG.
-
-Examples:
-
-- poll attempt
-- current record count
-- per-record successful correlation diagnostics
-- repeated readiness attempts
-
-Keep:
-
-- failures
-- warnings
-- final timeout information
-- container diagnostics
-- useful suite summaries
-
-at appropriate visible levels.
-
-Do not hide failure information.
-
---------------------------------------------------
-
-E. HTTP client reuse
-
-Reuse immutable HttpClient instances where the same test class/environment
-currently creates them repeatedly.
-
-Use constants for immutable timeout Durations.
-
-Keep the built-image runtime readiness maximum timeout unchanged.
-
-The current:
-
-    120 second readiness deadline
-
-must remain unless there is strong correctness evidence to change it.
-
-A 500 ms polling interval is acceptable.
-
-======================================================================
-2. AUDIT ALL WAITING AND POLLING CODE
-   ======================================================================
-
-Search the entire SNS repository, especially test code, for:
-
-    Thread.sleep
-    Duration.ofSeconds
-    Duration.ofMillis
-    poll(
-    await
-    retry
-    maxAttempts
-    timeout
-    readiness
-    health
-    MAX_RETRIES
-    POLL_DURATION
-    WAIT_
-
-Inspect every test-side waiting loop.
-
-Fix:
-
-- milliseconds interpreted as seconds
-- unnecessarily long fixed sleeps
-- polling after success
-- duplicate readiness checks
-- redundant first polls
-- unnecessarily slow retry intervals
-- loops whose timeout is much larger than intended because of unit errors
-
-Do NOT simply shorten legitimate functional timeouts.
-
-Prefer:
-
-    bounded frequent polling
-
-over:
-
-    large fixed sleeps
-
-where correctness is equivalent.
-
-======================================================================
-3. OPTIMISE KAFKA TEST POLLING
-   ======================================================================
-
-Inspect all Kafka consumers used by tests.
-
-Optimise:
-
-- initial assignment polling
-- consumer poll duration
-- record collection loops
-- repeated empty polling
-- batch processing
-- consumer group setup
-
-Where appropriate:
-
-- reuse Duration objects
-- break immediately when expected records are found
-- avoid scanning records after the expected result is satisfied
-- avoid unnecessary consumer recreation
-- reduce logging in successful loops
-
-Inspect:
+The current patch changes:
 
     max.poll.records
 
-and related test consumer settings.
+from:
 
-If scenarios commonly expect several records, use a sensible batch size so
-multiple records can be collected in one poll.
+    1
 
-Do not introduce a value without understanding the expected scenario sizes.
+to:
 
-Preserve strict testId/correlation filtering.
+    10
 
-======================================================================
-4. CACHE IMMUTABLE TEST CONFIGURATION AND RESOURCES
-   ======================================================================
+Keep this optimisation.
 
-Inspect test code for repeated reads of:
+However:
 
-- configuration.properties
-- feature support files
-- JSON templates
-- Avro templates
-- immutable test metadata
-- ObjectMapper construction
-- HTTP clients
-- immutable Properties/config maps
-- classpath resources
+    pollForRunlogRecords(...)
 
-If the same immutable resource is repeatedly loaded for multiple scenarios,
-cache it safely at class/suite level.
+still processes the full Kafka batch using forEach.
 
-Do NOT cache mutable scenario state.
+Change it so it stops processing matching records as soon as:
 
-Do NOT create shared mutable state that makes parallel execution unsafe.
+    runlogRecords.size() >= number
 
-======================================================================
-5. SPRING APPLICATION / CONTEXT REUSE
-   ======================================================================
+Use an explicit loop instead of forEach where necessary.
 
-Inspect the Testcontainers integration path and normal application tests.
+Required behaviour:
 
-Ensure the SNS application is started only once per intended integration suite.
+    poll
+    -> iterate records
+    -> keep strict testId filtering
+    -> add matching records
+    -> immediately break when requested count is reached
 
-Avoid:
+Do not collect additional matching records beyond the number requested merely
+because Kafka returned a larger batch.
 
-- repeated SpringApplicationBuilder startup
-- repeated application context creation
-- repeated infrastructure bootstrap
-- repeated topic setup
+Preserve all existing record validation and correlation behaviour.
 
-unless isolation requires it.
-
-Preserve clean shutdown.
-
-Do not restart the application between scenarios if the existing suite can
-safely share one runtime.
+Do NOT modify strict testId matching.
 
 ======================================================================
-6. TESTCONTAINERS INFRASTRUCTURE STARTUP
+3. REVERT LEGACY app.py TEST-SPEED CHANGES
    ======================================================================
 
-Optimise Testcontainers startup.
+In:
 
-Current infrastructure contains relationships such as:
+    cmd-adaptor-sns-integration-tests/src/test/resources/docker-compose/pre-integration-test/app.py
+
+Revert ONLY the test-speed optimisation changes introduced in the current patch.
+
+Remove additions such as:
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    CONNECT_RETRIES
+    CONNECT_RETRY_SLEEP_SECONDS
+    READINESS_SLEEP_SECONDS
+    READINESS_ATTEMPTS
+
+Restore the previous behaviour for:
+
+- Kafka connection retry
+- Redis retry
+- Schema Registry readiness
+- Kafdrop readiness
+- command adaptor readiness
+- aggregate readiness
+
+Restore aggregate readiness checks to their pre-current-patch implementation.
+
+Reason:
+
+This is the legacy Docker Compose fallback path.
+
+The active CI optimisation target is the Testcontainers path.
+
+Do not alter legacy Compose behaviour merely to obtain test-speed gains.
+
+IMPORTANT:
+
+Do NOT revert older intentional baseline fixes unrelated to this current
+test-speed patch.
+
+Only revert the changes introduced by the current test-speed optimisation.
+
+======================================================================
+4. IMPLEMENT REAL TESTCONTAINERS AGGREGATE PARALLEL STARTUP
+   ======================================================================
+
+In:
+
+    SnsTestcontainersEnvironment
+
+inspect the current snapshot aggregate startup implementation.
+
+The current flow is effectively sequential:
+
+    start party
+    wait party
+
+    start object
+    wait object
+
+    start location
+    wait location
+
+    start event
+    wait event
+
+    start service
+    wait service
+
+This is the actual path that should be optimised.
+
+Analyse whether the five aggregate containers:
+
+    AGGREGATE_PARTY
+    AGGREGATE_OBJECT
+    AGGREGATE_LOCATION
+    AGGREGATE_EVENT
+    AGGREGATE_SERVICE
+
+have any real startup dependency on each other.
+
+They all depend on shared infrastructure such as:
+
+    Kafka
+    Schema Registry
+    Redis
+
+Do NOT assume they depend on one another unless the code/configuration proves it.
+
+If they are independent after shared infrastructure is ready:
+
+start all five concurrently.
+
+Preferred implementation:
+
+use Testcontainers-supported dependency-aware concurrent startup such as:
+
+    Startables.deepStart(...).join()
+
+or another simple Testcontainers-native approach.
+
+Do NOT introduce a custom thread pool if Testcontainers already provides the
+appropriate startup primitive.
+
+After containers have started:
+
+verify readiness for each aggregate.
+
+Readiness checks may also run concurrently if safe.
+
+Preserve:
+
+- aggregate image
+- environment variables
+- network aliases
+- topic suffix
+- startup timeout
+- readiness URLs
+- failure diagnostics
+- shutdown behaviour
+
+Do NOT make startup success mean only "container process exists".
+
+All five aggregates must still become functionally ready.
+
+======================================================================
+5. PRESERVE THE SAME TOTAL AGGREGATE READINESS TIMEOUT
+   ======================================================================
+
+Current aggregate readiness logic uses approximately:
+
+    240 attempts
+    x
+    500ms
+
+which preserves about a 120 second maximum wait.
+
+Keep this total bounded timeout behaviour.
+
+Do not reduce the maximum allowed startup time just to make tests appear
+faster.
+
+Use:
+
+    HTTP_REQUEST_TIMEOUT
+
+and the shared:
+
+    HTTP_CLIENT
+
+where already implemented.
+
+Do not create a new HttpClient per attempt/container.
+
+======================================================================
+6. REVIEW TESTCONTAINERS BASE INFRASTRUCTURE STARTUP
+   ======================================================================
+
+Inspect the current startup ordering of:
 
     Redis
     ZooKeeper
     Kafka
     Schema Registry
 
-and snapshot runs contain aggregate containers:
+Determine actual dependencies.
 
-    party
-    object
-    location
-    event
-    service
+Expected likely dependency graph:
 
-Do not start independent containers sequentially without reason.
+    Redis             independent
+    ZooKeeper         independent
 
-Analyse dependencies carefully.
+    Kafka             depends on ZooKeeper
 
-For example:
+    Schema Registry   depends on Kafka
 
-- Redis and ZooKeeper may be started concurrently if independent.
-- Kafka must wait for ZooKeeper if this image/config still requires it.
-- Schema Registry must wait for Kafka.
-- Aggregate services should only start after their required Kafka/Redis/
-  Schema Registry infrastructure is available.
+If current code starts Redis and ZooKeeper sequentially, and there is no
+dependency between them, start them concurrently using Testcontainers-native
+startup.
 
-Use Testcontainers dependency-aware parallel startup where suitable.
+Then:
 
-Consider:
+    wait/start Kafka
 
-    Startables.deepStart(...)
+then:
 
-or equivalent Testcontainers-supported concurrent startup.
+    start Schema Registry
 
-Do NOT create race conditions.
+Do NOT violate actual container dependencies.
+
+Do not redesign the Kafka image or switch to KRaft as part of this task.
 
 ======================================================================
-7. PARALLELISE DOWNSTREAM AGGREGATE STARTUP
+7. KEEP CURRENT SAFE TEST-SPEED CHANGES
    ======================================================================
-
-The five aggregate containers are currently a high-value optimisation target
-if they are started in sequence.
-
-Current anti-pattern to remove when safe:
-
-    start party
-    wait party
-    start object
-    wait object
-    start location
-    wait location
-    start event
-    wait event
-    start service
-    wait service
-
-If these services do not require each other to become ready during startup,
-start them concurrently after their shared dependencies are ready.
-
-Then perform readiness validation for all of them.
-
-Use a bounded overall timeout.
-
-If there are actual inter-aggregate startup dependencies, preserve only those
-dependencies and parallelise the independent subset.
-
-Do not assume dependency order: inspect configuration and test behaviour.
-
-This optimisation must preserve snapshot scenario behaviour.
-
-======================================================================
-8. AVOID DUPLICATE READINESS WORK
-   ======================================================================
-
-Readiness should not be repeated unnecessarily.
-
-Where readiness is valid for the entire suite:
-
-    verify once
-    remember that the service is ready
-    avoid repeating the same health wait for every scenario
-
-Do not cache readiness across an actual restart.
-
-Apply this to:
-
-- SNS application
-- aggregate services
-- Testcontainers infrastructure
-
-where safe.
-
-======================================================================
-9. MAVEN REACTOR PARALLELISM
-   ======================================================================
-
-Evaluate and implement Maven reactor parallelism.
-
-Candidate:
-
-    mvn -T 1C clean verify -Pci-testcontainers-snapshot
-
-Compare against:
-
-    mvn clean verify -Pci-testcontainers-snapshot
-
-Use the same source state.
-
-Run comparable successful executions.
-
-Keep Maven -T 1C if it gives a meaningful repeatable improvement without:
-
-- CPU starvation
-- memory pressure
-- Testcontainers instability
-- intermittent Maven failures
-- test ordering problems
-
-If 1C is too aggressive, evaluate a conservative fixed value such as:
-
-    -T 2
-
-Do not increase concurrency blindly.
-
-Select the fastest stable setting.
-
-Do not add -T to the built-image runtime smoke automatically.
-
-The runtime smoke is dominated by container/application startup and should
-remain non-parallel unless independent measurement proves Maven reactor
-parallelism materially improves it.
-
-======================================================================
-10. SUREFIRE / FAILSAFE OPTIMISATION
-    ======================================================================
-
-Inspect root and module POMs.
-
-Determine exactly which tests are executed by:
-
-    Surefire
-    Failsafe
-
-Ensure tests are not executed twice.
-
-Inspect:
-
-- includes
-- excludes
-- IntegrationTest patterns
-- test phases
-- verify/integration-test bindings
-
-Remove duplicate test execution if present.
-
-Evaluate:
-
-    forkCount
-    reuseForks
-
-for materially expensive suites.
-
-Use conservative values first.
-
-Example candidate:
-
-    forkCount = 2
-    reuseForks = true
-
-Preserve JaCoCo compatibility.
-
-If argLine is configured, use JaCoCo-safe composition such as:
-
-    @{argLine}
-
-Do not break coverage instrumentation.
-
-======================================================================
-11. CUCUMBER RUNNER PARALLELISM
-    ======================================================================
-
-The current real integration suite uses one Cucumber runner.
-
-Inspect all feature files and scenario tags.
-
-If test execution itself remains a material cost after infrastructure
-optimisation, split the suite into balanced runner groups.
-
-Possible grouping dimensions:
-
-- command scenarios
-- snapshot scenarios
-- logical feature groups
-- approximately equal observed execution time
-
-Do NOT duplicate scenarios.
-
-The original catch-all runner must not execute the same features in addition
-to new grouped runners.
-
-Every non-ignored business scenario must execute exactly once.
-
-Preserve:
-
-    expected scenario count
-    coverage guard
-    testId isolation
-    unique consumer groups
-    dynamic topic suffix
-
-Start with 2 groups/forks.
-
-Increase only when stable and beneficial.
-
-======================================================================
-12. HANDLE STATIC MUTABLE STATE BEFORE TEST PARALLELISM
-    ======================================================================
-
-Before enabling same-process or multi-runner concurrency, inspect:
-
-    static mutable fields
-
-in:
-
-- SnsSteps
-- integration step classes
-- helper classes
-- scenario data holders
-
-Classify each static field:
-
-1. immutable suite configuration
-2. shared infrastructure
-3. mutable scenario state
-
-Do not parallelise mutable scenario state unsafely.
-
-Where required, convert scenario-specific state to:
-
-- instance fields
-- scenario scoped state
-- ThreadLocal only where technically justified
-
-Do not perform unnecessary architectural refactoring.
-
-Fix only what is required to make selected parallelism safe.
-
-======================================================================
-13. JVM TEST PROCESS TUNING
-    ======================================================================
-
-If Maven/Surefire/Failsafe forks are retained, evaluate conservative
-short-lived JVM optimisation settings.
-
-Candidates include:
-
-    -XX:TieredStopAtLevel=1
-
-and a suitable GC for short-lived test JVMs.
-
-Do not add JVM flags blindly.
-
-Keep only settings that improve wall-clock without introducing instability.
-
-Do not alter production JVM settings.
-
-======================================================================
-14. JUNIT 5 / CUCUMBER PLATFORM PARALLEL EXECUTION
-    ======================================================================
-
-Evaluate JUnit Platform / Cucumber JUnit 5 parallel execution as a deeper
-optimisation.
-
-This is an implementation experiment, not documentation work.
-
-Do not keep both competing concurrency models for the same suite.
-
-Compare:
-
-A. JUnit4 Cucumber runners + Failsafe forks
-
-versus
-
-B. Cucumber JUnit Platform Engine same-JVM parallelism
-
-Only migrate if JUnit5:
-
-- executes every business scenario exactly once
-- preserves all assertions
-- preserves hooks/plugins/reports
-- preserves Testcontainers lifecycle
-- preserves scenario isolation
-- produces a meaningful additional wall-clock improvement
-- does not introduce flaky shared-state behaviour
-
-If JUnit5 is not clearly better, revert the experiment completely.
-
-Do not leave migration scaffolding behind.
-
-======================================================================
-15. CI PARALLEL EXECUTION / MATRIX
-    ======================================================================
-
-Evaluate whether independent test groups can run as separate Drone steps.
-
-Candidate architecture:
-
-    build/common prerequisites
-             |
-      -----------------
-      |               |
-runner group A   runner group B
-|               |
------------------
-|
-final validation
-
-Only use a CI matrix/separate steps if it improves total pipeline wall-clock
-more than Maven/Failsafe forks and does not duplicate expensive Testcontainers
-infrastructure unnecessarily.
-
-Do not combine CI sharding and JVM fork sharding just because both are
-available.
-
-Test competing models and keep the fastest stable architecture.
-
-======================================================================
-16. BUILT-IMAGE RUNTIME TEST OPTIMISATION
-    ======================================================================
 
 Keep:
 
-    BuiltImageRuntimeIntegrationTest
+- INITIAL_POLL_DURATION using Duration.ofMillis(...)
+- POLL_DURATION using Duration.ofMillis(...)
+- removal of unused kafkaConsumer.assignment()
+- max.poll.records = 10
+- reduced successful-loop INFO logs to DEBUG
+- early exit in normal record polling
+- shared HttpClient usage
+- reusable timeout Duration constants
+- aggregate readiness interval 500ms
+- Cucumber "pretty" plugin removal
+- BuiltImageRuntimeIntegrationTest shared HttpClient
+- built-image readiness polling at 500ms
+- Schema Registry round-trip validation
+- hard CI performance threshold removal
 
-Do not remove functionality from it.
+Do not reintroduce:
 
-Optimise only overhead:
-
-- shared HttpClient
-- reusable Duration
-- 500 ms readiness polling
-- immediate exit after readiness succeeds
-- avoid duplicate startup checks
-- avoid duplicate Maven work if it is provably unnecessary
-
-Do not add Maven -T here unless separately proven useful.
-
-Do not shorten the 120 second maximum readiness protection merely for speed.
-
-======================================================================
-17. DO NOT REBUILD THINGS TWICE
-    ======================================================================
-
-Inspect the complete CI flow for duplicate work.
-
-Look for repeated:
-
-- Maven clean/package/install
-- dependency compilation
-- integration module compilation
-- application JAR creation
-- Docker image build
-- container image preparation
-- Avro generation
-
-Reuse already-created outputs where safe.
-
-Do not bypass correctness or create stale-artifact risk.
-
-The final pipeline should avoid rebuilding the same deterministic artefact
-multiple times without a technical reason.
+    Duration.ofSeconds(POLL_DURATION_MS)
 
 ======================================================================
-18. JACOCO
-    ======================================================================
+8. MAVEN -T 1C
+   ======================================================================
 
-Keep CI JaCoCo coverage enabled.
+Do NOT change the current main CI:
 
-Do NOT remove coverage for pipeline speed.
+    mvn -T 1C clean verify -Pci-testcontainers-snapshot
 
-Ensure any Surefire/Failsafe fork changes preserve JaCoCo instrumentation.
+in this fix.
 
-Local-only skip options may remain if already supported, but CI coverage must
-stay active.
+Leave it as the current candidate.
 
-======================================================================
-19. REMOVE EXPERIMENTS THAT LOSE
-    ======================================================================
+Do not add Maven -T to the built-image runtime smoke.
 
-During this task you may temporarily test multiple approaches.
-
-That is expected.
-
-But the final Git diff must contain only the winning implementation.
-
-If an experiment is rejected, completely remove:
-
-- temporary classes
-- runner classes
-- POM properties
-- temporary profiles
-- CI steps
-- scripts
-- timing helpers
-- debug-only source changes
-- comments describing rejected approaches
-
-Do not leave disabled experiments in the repository.
+We will decide whether -T 1C remains based on actual CI timing after this patch.
 
 ======================================================================
-20. PERFORMANCE DECISION RULE
-    ======================================================================
+9. DO NOT CHANGE TEST EXECUTION MODEL YET
+   ======================================================================
 
-For compatible optimisations:
+For this focused fix do NOT introduce:
 
-    combine them.
+- new Cucumber runners
+- Failsafe forkCount changes
+- JUnit 5 migration
+- Cucumber parallel execution
+- CI matrix/sharding
+- static-state architecture refactors
 
-For mutually exclusive approaches:
-
-    test both and keep the better one.
-
-Examples of potentially competing strategies:
-
-    Failsafe forks
-    vs
-    CI runner matrix
-    vs
-    JUnit5 same-JVM parallelism
-
-Do NOT stack all three automatically.
-
-Use the fastest stable model.
-
-Performance decisions must be based on wall-clock behaviour of successful
-runs, not theoretical expectations.
-
-Do not introduce hard CI performance failure thresholds.
-
-Timing may be printed temporarily or to terminal output, but do not make
-pipeline success depend on arbitrary duration limits.
+Those will be evaluated after the Testcontainers startup bottleneck is fixed.
 
 ======================================================================
-21. REQUIRED PARITY
+10. VALIDATION
     ======================================================================
 
-After every retained major optimisation verify:
+Run the final main Testcontainers suite:
+
+    mvn -T 1C clean verify -Pci-testcontainers-snapshot
+
+Verify:
 
 - BUILD SUCCESS
-- complete Maven reactor
-- real uk.gov.ho.dacc.fdp.IntegrationTest or its final legitimate replacement
-- all non-ignored business scenarios execute exactly once
-- expected scenario count preserved
+- real business IntegrationTest runs
+- all expected non-ignored business scenarios execute exactly once
+- expected scenario count unchanged
 - TestcontainersSuiteCoverageTest passes
 - failures = 0
 - errors = 0
-- no unexpected skipped business tests
-- Docker/Testcontainers genuinely executed
-- Kafka/Schema Registry functional path works
-- aggregate snapshot scenarios work
-- strict testId correlation remains
-- JaCoCo remains active
-- failure diagnostics remain available
+- no unexpected skips
+- Schema Registry round-trip still runs
+- strict testId filtering remains
+- all five aggregate containers start and reach readiness
+- no Testcontainers startup race
+- Docker failure cannot silently produce green
 
-A green build with zero real business scenarios is a FAILURE.
-
-======================================================================
-22. RUN THE PIPELINE MULTIPLE TIMES
-    ======================================================================
-
-After selecting the final combination, run the final main suite at least twice
-if the environment allows.
-
-Use the final exact command selected for CI.
-
-Check for:
-
-- timing consistency
-- flakes
-- container startup races
-- Kafka timing problems
-- scenario ordering issues
-- resource contention
-
-Do not accept an optimisation that is fast only once but unstable.
+If local environment cannot execute the full suite, do not fake success.
 
 ======================================================================
-23. FINAL BUILT-IMAGE VALIDATION
+11. FINAL DIFF REVIEW
     ======================================================================
 
-Run the final built-image runtime path using the exact final image:
+The final diff for this fix should mainly contain:
 
-    docker-compose-command-adaptor:latest
+SnsSteps.java
+- remove readiness cache
+- runlog early-break
+- retain existing safe polling/logging improvements
 
-and the normal non-parallel runtime command unless measurement explicitly
-proved otherwise:
+SnsTestcontainersEnvironment.java
+- actual concurrent Testcontainers startup
+- dependency-correct infrastructure startup
+- existing shared HTTP/readiness improvements
 
-    mvn -pl cmd-adaptor-sns-integration-tests -am verify \
-      -Pci-built-image-runtime-smoke \
-      -Dsns.runtime.image=docker-compose-command-adaptor:latest
+app.py
+- revert current test-speed experiment only
 
-Confirm:
-
-    BuiltImageRuntimeIntegrationTest
-    Tests run: 1
-    Failures: 0
-    Errors: 0
-    Skipped: 0
-
-======================================================================
-24. FINAL DIFF CLEANUP
-    ======================================================================
-
-Inspect:
-
-    git status
-    git diff
-
-The final diff must contain only test/CI speed improvements required by the
-winning solution.
-
-Do not perform unrelated production refactoring.
-
-Do not modify business behaviour.
-
-Do not modify feature semantics solely to make parallelisation easier.
-
-Do not weaken assertions.
-
-Do not create documentation.
-
-======================================================================
-25. EXPECTED FINAL OUTCOME
-    ======================================================================
-
-The final implementation should contain as many compatible optimisations as
-prove technically sound, including where beneficial:
-
-- timing-unit correctness fixes
-- faster Kafka polling
-- reduced successful-loop logging
-- cached immutable config/resources
-- shared HttpClient/Duration objects
-- reduced duplicate readiness
-- Spring/application reuse
-- Testcontainers lifecycle reuse
-- dependency-aware parallel infrastructure startup
-- parallel aggregate startup
-- Maven reactor parallelism
-- duplicate Maven/test execution removal
-- Surefire/Failsafe tuning
-- safe Cucumber runner parallelisation
-- necessary static-state isolation
-- conservative test JVM tuning
-- CI-level parallelism if it beats JVM forks
-- JUnit5 parallel execution only if it beats the alternatives
-- no duplicate build work
-- unchanged coverage and validation protections
-
-Do not stop after implementing only the obvious quick wins.
-
-Inspect the whole repository and pursue the remaining material test/CI
-bottlenecks until there is no further technically justified optimisation in
-the above scope.
+No unrelated files should be changed.
 
 ======================================================================
 FINAL RESPONSE
@@ -870,23 +407,18 @@ FINAL RESPONSE
 
 Do not create a report file.
 
-Reply only in terminal/chat with a concise final summary containing:
+Reply only with a short terminal/chat summary:
 
-- final main Maven command
-- final concurrency model
-- Testcontainers startup changes
+- READINESS_CONFIRMED removed: YES/NO
+- runlog early-break added: YES/NO
+- legacy app.py speed changes reverted: YES/NO
+- base Testcontainers startup model
 - aggregate startup model
-- Kafka/polling changes
-- config/context reuse changes
-- Cucumber execution model
-- Maven/Surefire/Failsafe changes
-- rejected competing approaches
-- before/after successful wall-clock observations
+- aggregate readiness model
+- full suite result
 - scenario count
 - failures/errors/skips
-- coverage status
-- built-image runtime result
-- final files changed
+- files changed
 - blocker: none / exact blocker
 
-Maximum 25 lines.
+Maximum 15 lines.
