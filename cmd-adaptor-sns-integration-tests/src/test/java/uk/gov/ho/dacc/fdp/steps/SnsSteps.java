@@ -472,11 +472,8 @@ public class SnsSteps implements EventListener {
     }
 
     private boolean haveTestIdHeader(ConsumerRecord<?, ?> rec) {
-        if (rec.headers().lastHeader("testId") == null) {
-            // Some local Testcontainers runs do not propagate the originating header through all pipelines.
-            return TESTCONTAINERS_ENABLED;
-        }
-        return Arrays.equals(rec.headers().lastHeader("testId").value(), testId.getBytes(StandardCharsets.UTF_8));
+        return rec.headers().lastHeader("testId") != null &&
+                Arrays.equals(rec.headers().lastHeader("testId").value(), testId.getBytes(StandardCharsets.UTF_8));
     }
 
     private Object pollRecords(
@@ -521,7 +518,7 @@ public class SnsSteps implements EventListener {
         while (runlogRecords.size() < number && ++index < MAX_RETRIES_GET_CONSUMER_RECORDS) {
             log.info("Retrieving runlog records, attempt {}, record count {}", index, runlogRecords.size());
             ConsumerRecords<IdentityRecord, EntryRecord> records =
-                    kafkaConsumerRunlogCmd.poll(Duration.ofMillis(POLL_DURATION_MS));
+                    kafkaConsumerRunlogCmd.poll(Duration.ofSeconds(POLL_DURATION_MS));
             records.forEach(rec -> {
                 log.info("Runlog record id = {}, has testId header = {}",
                         rec.value().getMetadata().getIdentityRecord().getId(),

@@ -54,7 +54,7 @@ def create_kafka_topics(bootstrap_servers, topics):
             logger.error(e)
             time.sleep(1)
 
-    for topic_name in topics:
+    for topic_name in topic_names:
         logger.info(f"Creating Kafka topic {topic_name} with {PARTITIONS} partitions.")
         topics_list.append(
             NewTopic(

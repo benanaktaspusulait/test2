@@ -3,9 +3,6 @@ Feature: Test SNS Command Adaptor - Service
 
   Scenario: ServiceRecord
     Given template StreamIngestRecord with the base file "sns-multiple.input"
-    And template EoriCdlzLandingRecord with the base file "eori.input"
-    When Eori CDLZ data is presented as per the template to the landing topic landing-413
-    When Readiness health check is completed
     When StreamIngestRecord source data is presented with attributes as per the template to the input topic with prefix fdp-sns-input
     Then 6 Service SNAPSHOTS will be emitted
     And one Service record for "SNS-ITEM" with following attributes

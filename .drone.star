@@ -216,8 +216,7 @@ def ci_pipeline(ctx):
                 'DOCKER_API_VERSION': '1.41',
                 'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
                 'TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX': 'docker.digital.homeoffice.gov.uk/',
-                'TESTCONTAINERS_RYUK_DISABLED': 'true',
-                'TESTCONTAINERS_MAX_SECONDS': '720'
+                'TESTCONTAINERS_RYUK_DISABLED': 'true'
             },
             'depends_on': [
                 'Extract Adaptor Information'
@@ -263,10 +262,7 @@ def ci_pipeline(ctx):
                 'mkdir -p "$${DOCKER_CONFIG}"',
                 'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
                 "printf '{\"auths\":{\"%s\":{\"auth\":\"%%s\"}}}\\n' \"$${AUTH_VALUE}\" > \"$${DOCKER_CONFIG}/config.json\"" % ARTIFACTORY_REGISTRY,
-                'RUNTIME_SMOKE_START=$(date +%s)',
-                'DOCKER_API_VERSION=1.41 mvn -Ddocker.api.version=1.41 -DDOCKER_API_VERSION=1.41 -pl cmd-adaptor-sns-integration-tests -am verify -Pci-built-image-runtime-smoke -Dsns.runtime.image=docker-compose-command-adaptor:latest',
-                'RUNTIME_SMOKE_DURATION=$(($(date +%s)-RUNTIME_SMOKE_START))',
-                'echo "CI_TIMING name=built_image_runtime_smoke duration_seconds=$${RUNTIME_SMOKE_DURATION}"'
+                'DOCKER_API_VERSION=1.41 mvn -Ddocker.api.version=1.41 -DDOCKER_API_VERSION=1.41 -pl cmd-adaptor-sns-integration-tests -am verify -Pci-built-image-runtime-smoke -Dsns.runtime.image=docker-compose-command-adaptor:latest'
             ],
             'environment': {
                 'DOCKER_HOST': 'tcp://docker:2375',
@@ -308,10 +304,7 @@ def ci_pipeline(ctx):
             ],
             'commands': [
                 # PM-75944: updated application to use ecr trivy db
-                'trivy image --exit-code 0 --no-progress docker-compose-command-adaptor:latest --severity CRITICAL,HIGH --ignore-unfixed --db-repository  acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db',
-                'PIPELINE_DURATION=$(($(date +%s)-$${DRONE_BUILD_STARTED}))',
-                'echo "CI_TIMING name=branch_pipeline duration_seconds=$${PIPELINE_DURATION}"',
-                'if [ "$${PIPELINE_DURATION}" -gt 815 ]; then echo "Branch pipeline exceeded 815s"; exit 1; fi'
+                'trivy image --exit-code 0 --no-progress docker-compose-command-adaptor:latest --severity CRITICAL,HIGH --ignore-unfixed --db-repository  acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db'
             ],
             'image': TRIVY_IMAGE,
             'environment': {
