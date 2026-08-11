@@ -15,5 +15,4 @@ RUN apt-get clean \
   && pip install -r /tmp/requirements.txt
 
 COPY app.py /usr/local/bin
-COPY topic-templates.txt /usr/local/bin
 ENTRYPOINT /usr/local/bin/app.py

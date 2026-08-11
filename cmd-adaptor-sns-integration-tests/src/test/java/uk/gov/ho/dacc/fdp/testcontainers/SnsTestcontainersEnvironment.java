@@ -21,10 +21,6 @@ import java.net.InetAddress;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.time.Duration;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -64,7 +60,6 @@ public final class SnsTestcontainersEnvironment {
     private static final String KAFKA_INTERNAL_BOOTSTRAP = "PLAINTEXT://" + KAFKA_ALIAS + ":29092";
     private static final String TOPIC_SUFFIX = "tc" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     private static final String RUN_ID = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-    private static final String SHARED_TOPIC_TEMPLATE_RESOURCE = "docker-compose/pre-integration-test/topic-templates.txt";
 
     private static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
             .withNetwork(NETWORK)
@@ -479,9 +474,7 @@ public final class SnsTestcontainersEnvironment {
     }
 
     private static void createRequiredTopics() {
-        Set<String> topicNames = new LinkedHashSet<>(loadSharedTopicTemplates(TOPIC_SUFFIX));
-        topicNames.add("landing-1");
-        topicNames.add("landing-413");
+        Set<String> topicNames = new LinkedHashSet<>(requiredTopicNames());
 
         List<NewTopic> topics = new ArrayList<>();
         for (String topicName : topicNames) {
@@ -498,29 +491,143 @@ public final class SnsTestcontainersEnvironment {
         }
     }
 
-    private static List<String> loadSharedTopicTemplates(String topicSuffix) {
-        InputStream stream = SnsTestcontainersEnvironment.class.getClassLoader()
-                .getResourceAsStream(SHARED_TOPIC_TEMPLATE_RESOURCE);
-        if (stream == null) {
-            throw new IllegalStateException("Missing shared topic template resource: " + SHARED_TOPIC_TEMPLATE_RESOURCE);
-        }
+    private static List<String> requiredTopicNames() {
+        List<String> templates = List.of(
+                "fdp_cmd_suspense_{suffix}",
+                "fdp_error_{suffix}",
+                "fdp_matching_error_{suffix}",
+                "fdp_targeted_delete_input_{suffix}",
+                "fdp_party_cmd_{suffix}",
+                "fdp_party_event_{suffix}",
+                "fdp_party_snapshot_{suffix}",
+                "fdp_party_error_{suffix}",
+                "fdp_party_suspense_data_quality_{suffix}",
+                "fdp_party_suspense_no_change_{suffix}",
+                "fdp_party_suspense_late_arriving_{suffix}",
+                "fdp-aggregate-party-{suffix}-fdp_pole_snapshot_state_store_party-changelog",
+                "fdp-aggregate-party-{suffix}-fdp_v1_v2_state_store_party-changelog",
+                "fdp_object_cmd_{suffix}",
+                "fdp_object_event_{suffix}",
+                "fdp_object_snapshot_{suffix}",
+                "fdp_object_error_{suffix}",
+                "fdp_object_suspense_data_quality_{suffix}",
+                "fdp_object_suspense_no_change_{suffix}",
+                "fdp_object_suspense_late_arriving_{suffix}",
+                "fdp-aggregate-object-{suffix}-fdp_pole_snapshot_state_store_object-changelog",
+                "fdp-aggregate-object-{suffix}-fdp_v1_v2_state_store_object-changelog",
+                "fdp_location_cmd_{suffix}",
+                "fdp_location_event_{suffix}",
+                "fdp_location_snapshot_{suffix}",
+                "fdp_location_error_{suffix}",
+                "fdp_location_suspense_data_quality_{suffix}",
+                "fdp_location_suspense_no_change_{suffix}",
+                "fdp_location_suspense_late_arriving_{suffix}",
+                "fdp-aggregate-location-{suffix}-fdp_pole_snapshot_state_store_location-changelog",
+                "fdp-aggregate-location-{suffix}-fdp_v1_v2_state_store_location-changelog",
+                "fdp_event_cmd_{suffix}",
+                "fdp_event_event_{suffix}",
+                "fdp_event_snapshot_{suffix}",
+                "fdp_event_error_{suffix}",
+                "fdp_event_suspense_data_quality_{suffix}",
+                "fdp_event_suspense_no_change_{suffix}",
+                "fdp_event_suspense_late_arriving_{suffix}",
+                "fdp-aggregate-event-{suffix}-fdp_pole_snapshot_state_store_event-changelog",
+                "fdp-aggregate-event-{suffix}-fdp_v1_v2_state_store_event-changelog",
+                "fdp_service_cmd_{suffix}",
+                "fdp_service_event_{suffix}",
+                "fdp_service_snapshot_{suffix}",
+                "fdp_service_error_{suffix}",
+                "fdp_service_suspense_data_quality_{suffix}",
+                "fdp_service_suspense_no_change_{suffix}",
+                "fdp_service_suspense_late_arriving_{suffix}",
+                "fdp-aggregate-service-{suffix}-fdp_pole_snapshot_state_store_service-changelog",
+                "fdp-aggregate-service-{suffix}-fdp_v1_v2_state_store_service-changelog",
+                "runlog_fdp_cmda_{suffix}",
+                "runlog_fdp_del_{suffix}",
+                "fdp_matchingv1v2_cmd_{suffix}",
+                "fdp_polev1_address_event_{suffix}",
+                "fdp_polev1_contact_event_{suffix}",
+                "fdp_polev1_error_{suffix}",
+                "fdp_polev1_event_event_{suffix}",
+                "fdp_polev1_location_event_{suffix}",
+                "fdp_polev1_locationvirtual_event_{suffix}",
+                "fdp_polev1_object_event_{suffix}",
+                "fdp_polev1_objectdetail_event_{suffix}",
+                "fdp_polev1_organisation_event_{suffix}",
+                "fdp_polev1_party_event_{suffix}",
+                "fdp_polev1_person_event_{suffix}",
+                "fdp_polev1_relationship_event_{suffix}",
+                "fdp_polev1_service_event_{suffix}",
+                "fdp_matching_deleted_{suffix}",
+                "fdp_matching_merged_{suffix}",
+                "fdp_matching_v1v2_merged_{suffix}",
+                "fdp_profiling_from_matching_wash_{suffix}",
+                "fdp_profiling_to_matching_wash_{suffix}",
+                "to-matching-delta-address-{suffix}",
+                "to-matching-delta-address-{suffix}-h",
+                "to-matching-delta-consignment-{suffix}",
+                "to-matching-delta-consignment-{suffix}-h",
+                "to-matching-delta-contact-{suffix}",
+                "to-matching-delta-contact-{suffix}-h",
+                "to-matching-delta-movement-{suffix}",
+                "to-matching-delta-movement-{suffix}-h",
+                "to-matching-delta-object-{suffix}",
+                "to-matching-delta-object-{suffix}-h",
+                "to-matching-delta-organisation-{suffix}",
+                "to-matching-delta-organisation-{suffix}-h",
+                "to-matching-delta-person-{suffix}",
+                "to-matching-delta-person-{suffix}-h",
+                "to-matching-delta-virtual-{suffix}",
+                "to-matching-delta-virtual-{suffix}-h",
+                "to-matching-delta-transport-{suffix}",
+                "to-matching-delta-transport-{suffix}-h",
+                "to-matching-delta-error-{suffix}",
+                "to-matching-delta-error-{suffix}-h",
+                "to-matching-wash-address-{suffix}",
+                "to-matching-wash-address-{suffix}-h",
+                "to-matching-wash-consignment-{suffix}",
+                "to-matching-wash-consignment-{suffix}-h",
+                "to-matching-wash-contact-{suffix}",
+                "to-matching-wash-contact-{suffix}-h",
+                "to-matching-wash-movement-{suffix}",
+                "to-matching-wash-movement-{suffix}-h",
+                "to-matching-wash-object-{suffix}",
+                "to-matching-wash-object-{suffix}-h",
+                "to-matching-wash-organisation-{suffix}",
+                "to-matching-wash-organisation-{suffix}-h",
+                "to-matching-wash-person-{suffix}",
+                "to-matching-wash-person-{suffix}-h",
+                "to-matching-wash-virtual-{suffix}",
+                "to-matching-wash-virtual-{suffix}-h",
+                "to-matching-wash-transport-{suffix}",
+                "to-matching-wash-transport-{suffix}-h",
+                "to-matching-wash-error-{suffix}",
+                "to-matching-wash-error-{suffix}-h",
+                "from-matching-delta-address-{suffix}",
+                "from-matching-delta-contact-{suffix}",
+                "from-matching-delta-object-{suffix}",
+                "from-matching-delta-organisation-{suffix}",
+                "from-matching-delta-person-{suffix}",
+                "from-matching-delta-virtual-{suffix}",
+                "from-matching-delta-transport-{suffix}",
+                "from-matching-wash-address-{suffix}",
+                "from-matching-wash-contact-{suffix}",
+                "from-matching-wash-object-{suffix}",
+                "from-matching-wash-organisation-{suffix}",
+                "from-matching-wash-person-{suffix}",
+                "from-matching-wash-virtual-{suffix}",
+                "from-matching-wash-transport-{suffix}",
+                "fdp-sns-input_{suffix}",
+                "fdp-sns-lookup-eori",
+                "fdp-sns-lookup-aeo");
 
-        List<String> topicNames = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String trimmed = line.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                    continue;
-                }
-                topicNames.add(trimmed.replace("{suffix}", topicSuffix));
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to read shared topic template resource", e);
+        List<String> requiredTopics = new ArrayList<>(templates.size() + 2);
+        for (String template : templates) {
+            requiredTopics.add(template.replace("{suffix}", TOPIC_SUFFIX));
         }
-
-        LOG.info("Loaded {} shared topic templates from {}", topicNames.size(), SHARED_TOPIC_TEMPLATE_RESOURCE);
-        return topicNames;
+        requiredTopics.add("landing-1");
+        requiredTopics.add("landing-413");
+        return requiredTopics;
     }
 
     private static void validateSchemaRegistryRoundTrip() {

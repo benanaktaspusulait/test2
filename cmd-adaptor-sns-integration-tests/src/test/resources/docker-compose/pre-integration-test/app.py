@@ -8,7 +8,6 @@
 #############################################################################
 import logging
 import os
-from pathlib import Path
 import sys
 import time
 import urllib.error
@@ -32,8 +31,6 @@ if "ADAPTOR_NAME" not in os.environ or len(os.environ["ADAPTOR_NAME"]) == 0:
 
 ADAPTOR_NAME = os.environ["ADAPTOR_NAME"]
 logger.info(f"FDP Application Name = {ADAPTOR_NAME}")
-TOPIC_SUFFIX = os.environ.get("FDP_APP_KAFKA_TOPIC_SUFFIX", "0")
-TOPIC_TEMPLATE_PATH = Path("/usr/local/bin/topic-templates.txt")
 
 if ADAPTOR_NAME == "crs":
     PARTITIONS = 3
@@ -197,29 +194,165 @@ def wait_for_http(url, title, sleep_time=10, attempts=0, expected_response_codes
     assert url_connected, f"Timed out waiting for {url} to be ready."
 
 
-def load_shared_topic_templates(template_path, topic_suffix):
-    topic_names_local = []
-
-    if not template_path.exists():
-        raise FileNotFoundError(f"Shared topic template file not found: {template_path}")
-
-    with template_path.open("r", encoding="utf-8") as f:
-        for raw_line in f:
-            line = raw_line.strip()
-            if not line or line.startswith("#"):
-                continue
-            topic_names_local.append(line.replace("{suffix}", topic_suffix))
-
-    logger.info(
-        "Loaded %s shared topic templates from %s with suffix '%s'",
-        len(topic_names_local),
-        template_path,
-        topic_suffix,
-    )
-    return topic_names_local
-
-
-topic_names = load_shared_topic_templates(TOPIC_TEMPLATE_PATH, TOPIC_SUFFIX)
+topic_names = [
+    # Command adaptor suspense topic.
+    "fdp_cmd_suspense_0",
+    # FDP apps suspense / error topic(s).
+    "fdp_error_0",
+    "fdp_matching_error_0",
+    # Delete Adaptor input topic (fdp core 9.4.9 and newer).
+    "fdp_targeted_delete_input_0",
+    #
+    #  Party
+    #
+    "fdp_party_cmd_0",
+    "fdp_party_event_0",
+    "fdp_party_snapshot_0",
+    "fdp_party_error_0",
+    "fdp_party_suspense_data_quality_0",
+    "fdp_party_suspense_no_change_0",
+    "fdp_party_suspense_late_arriving_0",
+    "fdp-aggregate-party-0-fdp_pole_snapshot_state_store_party-changelog",
+    "fdp-aggregate-party-0-fdp_v1_v2_state_store_party-changelog",
+    #
+    #  Object
+    #
+    "fdp_object_cmd_0",
+    "fdp_object_event_0",
+    "fdp_object_snapshot_0",
+    "fdp_object_error_0",
+    "fdp_object_suspense_data_quality_0",
+    "fdp_object_suspense_no_change_0",
+    "fdp_object_suspense_late_arriving_0",
+    "fdp-aggregate-object-0-fdp_pole_snapshot_state_store_object-changelog",
+    "fdp-aggregate-object-0-fdp_v1_v2_state_store_object-changelog",
+    #
+    #  Location
+    #
+    "fdp_location_cmd_0",
+    "fdp_location_event_0",
+    "fdp_location_snapshot_0",
+    "fdp_location_error_0",
+    "fdp_location_suspense_data_quality_0",
+    "fdp_location_suspense_no_change_0",
+    "fdp_location_suspense_late_arriving_0",
+    "fdp-aggregate-location-0-fdp_pole_snapshot_state_store_location-changelog",
+    "fdp-aggregate-location-0-fdp_v1_v2_state_store_location-changelog",
+    #
+    #  Event
+    #
+    "fdp_event_cmd_0",
+    "fdp_event_event_0",
+    "fdp_event_snapshot_0",
+    "fdp_event_error_0",
+    "fdp_event_suspense_data_quality_0",
+    "fdp_event_suspense_no_change_0",
+    "fdp_event_suspense_late_arriving_0",
+    "fdp-aggregate-event-0-fdp_pole_snapshot_state_store_event-changelog",
+    "fdp-aggregate-event-0-fdp_v1_v2_state_store_event-changelog",
+    #
+    #  Service
+    #
+    "fdp_service_cmd_0",
+    "fdp_service_event_0",
+    "fdp_service_snapshot_0",
+    "fdp_service_error_0",
+    "fdp_service_suspense_data_quality_0",
+    "fdp_service_suspense_no_change_0",
+    "fdp_service_suspense_late_arriving_0",
+    "fdp-aggregate-service-0-fdp_pole_snapshot_state_store_service-changelog",
+    "fdp-aggregate-service-0-fdp_v1_v2_state_store_service-changelog",
+    #
+    #  Run Log
+    #
+    "runlog_fdp_cmda_0",
+    "runlog_fdp_del_0",
+    #
+    #  V1 V2
+    #
+    "fdp_matchingv1v2_cmd_0",
+    #
+    # V1 Output
+    #
+    "fdp_polev1_address_event_0",
+    "fdp_polev1_contact_event_0",
+    "fdp_polev1_error_0",
+    "fdp_polev1_event_event_0",
+    "fdp_polev1_location_event_0",
+    "fdp_polev1_locationvirtual_event_0",
+    "fdp_polev1_object_event_0",
+    "fdp_polev1_objectdetail_event_0",
+    "fdp_polev1_organisation_event_0",
+    "fdp_polev1_party_event_0",
+    "fdp_polev1_person_event_0",
+    "fdp_polev1_relationship_event_0",
+    "fdp_polev1_service_event_0",
+    #
+    # Internal matching
+    #
+    "fdp_matching_deleted_0",
+    "fdp_matching_merged_0",
+    "fdp_matching_v1v2_merged_0",
+    "fdp_profiling_from_matching_wash_0",
+    "fdp_profiling_to_matching_wash_0",
+    #
+    # Matching
+    #
+    "to-matching-delta-address-0",
+    "to-matching-delta-address-0-h",
+    "to-matching-delta-consignment-0",
+    "to-matching-delta-consignment-0-h",
+    "to-matching-delta-contact-0",
+    "to-matching-delta-contact-0-h",
+    "to-matching-delta-movement-0",
+    "to-matching-delta-movement-0-h",
+    "to-matching-delta-object-0",
+    "to-matching-delta-object-0-h",
+    "to-matching-delta-organisation-0",
+    "to-matching-delta-organisation-0-h",
+    "to-matching-delta-person-0",
+    "to-matching-delta-person-0-h",
+    "to-matching-delta-virtual-0",
+    "to-matching-delta-virtual-0-h",
+    "to-matching-delta-transport-0",
+    "to-matching-delta-transport-0-h",
+    "to-matching-delta-error-0",
+    "to-matching-delta-error-0-h",
+    "to-matching-wash-address-0",
+    "to-matching-wash-address-0-h",
+    "to-matching-wash-consignment-0",
+    "to-matching-wash-consignment-0-h",
+    "to-matching-wash-contact-0",
+    "to-matching-wash-contact-0-h",
+    "to-matching-wash-movement-0",
+    "to-matching-wash-movement-0-h",
+    "to-matching-wash-object-0",
+    "to-matching-wash-object-0-h",
+    "to-matching-wash-organisation-0",
+    "to-matching-wash-organisation-0-h",
+    "to-matching-wash-person-0",
+    "to-matching-wash-person-0-h",
+    "to-matching-wash-virtual-0",
+    "to-matching-wash-virtual-0-h",
+    "to-matching-wash-transport-0",
+    "to-matching-wash-transport-0-h",
+    "to-matching-wash-error-0",
+    "to-matching-wash-error-0-h",
+    "from-matching-delta-address-0",
+    "from-matching-delta-contact-0",
+    "from-matching-delta-object-0",
+    "from-matching-delta-organisation-0",
+    "from-matching-delta-person-0",
+    "from-matching-delta-virtual-0",
+    "from-matching-delta-transport-0",
+    "from-matching-wash-address-0",
+    "from-matching-wash-contact-0",
+    "from-matching-wash-object-0",
+    "from-matching-wash-organisation-0",
+    "from-matching-wash-person-0",
+    "from-matching-wash-virtual-0",
+    "from-matching-wash-transport-0",
+]
 
 # Input topics.
 if ADAPTOR_NAME == "brp":
@@ -548,8 +681,9 @@ elif ADAPTOR_NAME == "sds":
     topic_names.append("fdp-sds-input-relation_0")
     topic_names.append("fdp-sds-input-virtual_0")
 elif ADAPTOR_NAME == "sns":
-    # SNS-specific topics are loaded from the shared topic template.
-    pass
+    topic_names.append("fdp-sns-input_0")
+    topic_names.append("fdp-sns-lookup-eori")
+    topic_names.append("fdp-sns-lookup-aeo")
 else:
     topic_names.append(f"fdp-{ADAPTOR_NAME}-input_0")
 

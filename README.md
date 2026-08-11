@@ -54,19 +54,13 @@ mvn -Plocal-int-snapshot clean install
 For local development, prefer the Testcontainers path because it does not rely
 on the docker-compose lifecycle in this module.
 
-1) Run Testcontainers smoke tests (Redis + Kafka + Schema Registry wiring):
-
-```bash
-mvn -pl cmd-adaptor-sns-integration-tests -am -Plocal-testcontainers -Dtest='*RedisTest,*SmokeTest' -Dsurefire.failIfNoSpecifiedTests=false test
-```
-
-2) Run command-path integration tests with Testcontainers:
+1) Run command-path integration tests with Testcontainers:
 
 ```bash
 mvn -pl cmd-adaptor-sns-integration-tests -am clean verify -Plocal-testcontainers
 ```
 
-3) Run full snapshot integration tests (includes downstream aggregates in
+2) Run full snapshot integration tests (includes downstream aggregates in
 Testcontainers):
 
 ```bash

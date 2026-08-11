@@ -5,19 +5,13 @@ local runs, use Testcontainers first.
 
 ## Testcontainers (step-by-step)
 
-1) Run smoke tests for base infra wiring:
-
-```bash
-mvn -pl cmd-adaptor-sns-integration-tests -am -Plocal-testcontainers -Dtest='*RedisTest,*SmokeTest' -Dsurefire.failIfNoSpecifiedTests=false test
-```
-
-2) Run command-path Cucumber integration tests:
+1) Run command-path Cucumber integration tests:
 
 ```bash
 mvn -pl cmd-adaptor-sns-integration-tests -am clean verify -Plocal-testcontainers
 ```
 
-3) Run snapshot/full integration tests with downstream aggregates:
+2) Run snapshot/full integration tests with downstream aggregates:
 
 ```bash
 mvn -pl cmd-adaptor-sns-integration-tests -am clean verify -Plocal-testcontainers-snapshot

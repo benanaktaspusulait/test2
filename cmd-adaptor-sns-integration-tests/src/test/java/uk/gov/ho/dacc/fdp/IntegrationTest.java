@@ -13,7 +13,6 @@ import uk.gov.ho.dacc.fdp.testcontainers.SnsTestcontainersEnvironment;
 @CucumberOptions(features = "src/test/resources/features"
         , glue = "uk.gov.ho.dacc.fdp.steps"
         , plugin = {"pretty", "summary", "uk.gov.ho.dacc.fdp.steps.SnsSteps", "html:target/cucumber.html"}
-        , tags = "not @ignore"
 )
 public class IntegrationTest {
     @ClassRule

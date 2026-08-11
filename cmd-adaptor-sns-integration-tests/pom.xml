@@ -14,7 +14,6 @@
 
     <properties>
         <testcontainers.version>1.20.4</testcontainers.version>
-        <jedis.version>4.4.3</jedis.version>
         <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
         <sns.testcontainers.enabled>false</sns.testcontainers.enabled>
         <sns.testcontainers.skip-if-docker-unavailable>true</sns.testcontainers.skip-if-docker-unavailable>
@@ -23,7 +22,7 @@
         <docker.api.version>1.41</docker.api.version>
         <failsafe.includes>**/*IntegrationTest</failsafe.includes>
         <failsafe.excludes>none</failsafe.excludes>
-        <cucumber.filter.tags/>
+        <cucumber.filter.tags>not @ignore</cucumber.filter.tags>
     </properties>
 
     <profiles>
@@ -124,7 +123,7 @@
             </properties>
         </profile>
         <profile>
-            <!-- T4.2 Testcontainers Redis smoke/wiring pilot — opt-in, local only -->
+            <!-- Testcontainers command-path suite, local -->
             <id>local-testcontainers</id>
             <properties>
                 <skip.containers>true</skip.containers>
@@ -283,7 +282,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- T4.2: Testcontainers Redis smoke/wiring pilot -->
+        <!-- Testcontainers dependencies -->
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
@@ -300,12 +299,6 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>kafka</artifactId>
             <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>redis.clients</groupId>
-            <artifactId>jedis</artifactId>
-            <version>${jedis.version}</version>
             <scope>test</scope>
         </dependency>
 
