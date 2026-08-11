@@ -1,424 +1,353 @@
-Fix the current SNS test-speed optimisation patch.
-
-This is a focused IMPLEMENTATION task.
-
-Do NOT:
-- create reports
-- create markdown files
-- create TODO files
-- create benchmark artefacts
-- refactor unrelated code
-- change business feature semantics
-- remove test protections
-- weaken assertions
-- touch Docker/image optimisation work outside the exact areas below
-
-Keep the current good optimisations unless explicitly told otherwise.
-
-======================================================================
-1. REMOVE READINESS RESULT CACHING FROM SNSSTEPS
-   ======================================================================
-
-In:
-
-    cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
-
-REMOVE:
-
-    private static final AtomicBoolean READINESS_CONFIRMED ...
-
-and all related logic such as:
-
-    if (READINESS_CONFIRMED.get()) {
-        ...
-        return;
-    }
-
-    READINESS_CONFIRMED.set(true);
-
-    READINESS_CONFIRMED.set(false);
-
-Reason:
-
-The Cucumber step:
-
-    When Readiness health check is completed
-
-must continue to perform a real readiness check each time it is invoked.
-
-Do NOT turn this business/test step into a cached no-op after the first success.
-
-KEEP:
-
-- shared static HttpClient
-- REQUEST_TIMEOUT constant
-- debug-level repeated readiness logging
-- current real HTTP readiness behaviour
-- existing timeout/failure semantics
-
-Do not weaken the readiness check.
-
-======================================================================
-2. FIX RUNLOG BATCH PROCESSING FOR max.poll.records=10
-   ======================================================================
-
-The current patch changes:
-
-    max.poll.records
-
-from:
-
-    1
-
-to:
-
-    10
-
-Keep this optimisation.
-
-However:
-
-    pollForRunlogRecords(...)
-
-still processes the full Kafka batch using forEach.
-
-Change it so it stops processing matching records as soon as:
-
-    runlogRecords.size() >= number
-
-Use an explicit loop instead of forEach where necessary.
-
-Required behaviour:
-
-    poll
-    -> iterate records
-    -> keep strict testId filtering
-    -> add matching records
-    -> immediately break when requested count is reached
-
-Do not collect additional matching records beyond the number requested merely
-because Kafka returned a larger batch.
-
-Preserve all existing record validation and correlation behaviour.
-
-Do NOT modify strict testId matching.
-
-======================================================================
-3. REVERT LEGACY app.py TEST-SPEED CHANGES
-   ======================================================================
-
-In:
-
-    cmd-adaptor-sns-integration-tests/src/test/resources/docker-compose/pre-integration-test/app.py
-
-Revert ONLY the test-speed optimisation changes introduced in the current patch.
-
-Remove additions such as:
-
-    from concurrent.futures import ThreadPoolExecutor
-
-    CONNECT_RETRIES
-    CONNECT_RETRY_SLEEP_SECONDS
-    READINESS_SLEEP_SECONDS
-    READINESS_ATTEMPTS
-
-Restore the previous behaviour for:
-
-- Kafka connection retry
-- Redis retry
-- Schema Registry readiness
-- Kafdrop readiness
-- command adaptor readiness
-- aggregate readiness
-
-Restore aggregate readiness checks to their pre-current-patch implementation.
-
-Reason:
-
-This is the legacy Docker Compose fallback path.
-
-The active CI optimisation target is the Testcontainers path.
-
-Do not alter legacy Compose behaviour merely to obtain test-speed gains.
-
-IMPORTANT:
-
-Do NOT revert older intentional baseline fixes unrelated to this current
-test-speed patch.
-
-Only revert the changes introduced by the current test-speed optimisation.
-
-======================================================================
-4. IMPLEMENT REAL TESTCONTAINERS AGGREGATE PARALLEL STARTUP
-   ======================================================================
-
-In:
-
-    SnsTestcontainersEnvironment
-
-inspect the current snapshot aggregate startup implementation.
-
-The current flow is effectively sequential:
-
-    start party
-    wait party
-
-    start object
-    wait object
-
-    start location
-    wait location
-
-    start event
-    wait event
-
-    start service
-    wait service
-
-This is the actual path that should be optimised.
-
-Analyse whether the five aggregate containers:
-
-    AGGREGATE_PARTY
-    AGGREGATE_OBJECT
-    AGGREGATE_LOCATION
-    AGGREGATE_EVENT
-    AGGREGATE_SERVICE
-
-have any real startup dependency on each other.
-
-They all depend on shared infrastructure such as:
-
-    Kafka
-    Schema Registry
-    Redis
-
-Do NOT assume they depend on one another unless the code/configuration proves it.
-
-If they are independent after shared infrastructure is ready:
-
-start all five concurrently.
-
-Preferred implementation:
-
-use Testcontainers-supported dependency-aware concurrent startup such as:
-
-    Startables.deepStart(...).join()
-
-or another simple Testcontainers-native approach.
-
-Do NOT introduce a custom thread pool if Testcontainers already provides the
-appropriate startup primitive.
-
-After containers have started:
-
-verify readiness for each aggregate.
-
-Readiness checks may also run concurrently if safe.
-
-Preserve:
-
-- aggregate image
-- environment variables
-- network aliases
-- topic suffix
-- startup timeout
-- readiness URLs
-- failure diagnostics
-- shutdown behaviour
-
-Do NOT make startup success mean only "container process exists".
-
-All five aggregates must still become functionally ready.
-
-======================================================================
-5. PRESERVE THE SAME TOTAL AGGREGATE READINESS TIMEOUT
-   ======================================================================
-
-Current aggregate readiness logic uses approximately:
-
-    240 attempts
-    x
-    500ms
-
-which preserves about a 120 second maximum wait.
-
-Keep this total bounded timeout behaviour.
-
-Do not reduce the maximum allowed startup time just to make tests appear
-faster.
-
-Use:
-
-    HTTP_REQUEST_TIMEOUT
-
-and the shared:
-
-    HTTP_CLIENT
-
-where already implemented.
-
-Do not create a new HttpClient per attempt/container.
-
-======================================================================
-6. REVIEW TESTCONTAINERS BASE INFRASTRUCTURE STARTUP
-   ======================================================================
-
-Inspect the current startup ordering of:
-
-    Redis
-    ZooKeeper
-    Kafka
-    Schema Registry
-
-Determine actual dependencies.
-
-Expected likely dependency graph:
-
-    Redis             independent
-    ZooKeeper         independent
-
-    Kafka             depends on ZooKeeper
-
-    Schema Registry   depends on Kafka
-
-If current code starts Redis and ZooKeeper sequentially, and there is no
-dependency between them, start them concurrently using Testcontainers-native
-startup.
-
-Then:
-
-    wait/start Kafka
-
-then:
-
-    start Schema Registry
-
-Do NOT violate actual container dependencies.
-
-Do not redesign the Kafka image or switch to KRaft as part of this task.
-
-======================================================================
-7. KEEP CURRENT SAFE TEST-SPEED CHANGES
-   ======================================================================
-
-Keep:
-
-- INITIAL_POLL_DURATION using Duration.ofMillis(...)
-- POLL_DURATION using Duration.ofMillis(...)
-- removal of unused kafkaConsumer.assignment()
-- max.poll.records = 10
-- reduced successful-loop INFO logs to DEBUG
-- early exit in normal record polling
-- shared HttpClient usage
-- reusable timeout Duration constants
-- aggregate readiness interval 500ms
-- Cucumber "pretty" plugin removal
-- BuiltImageRuntimeIntegrationTest shared HttpClient
-- built-image readiness polling at 500ms
-- Schema Registry round-trip validation
-- hard CI performance threshold removal
-
-Do not reintroduce:
-
-    Duration.ofSeconds(POLL_DURATION_MS)
-
-======================================================================
-8. MAVEN -T 1C
-   ======================================================================
-
-Do NOT change the current main CI:
-
-    mvn -T 1C clean verify -Pci-testcontainers-snapshot
-
-in this fix.
-
-Leave it as the current candidate.
-
-Do not add Maven -T to the built-image runtime smoke.
-
-We will decide whether -T 1C remains based on actual CI timing after this patch.
-
-======================================================================
-9. DO NOT CHANGE TEST EXECUTION MODEL YET
-   ======================================================================
-
-For this focused fix do NOT introduce:
-
-- new Cucumber runners
-- Failsafe forkCount changes
-- JUnit 5 migration
-- Cucumber parallel execution
-- CI matrix/sharding
-- static-state architecture refactors
-
-Those will be evaluated after the Testcontainers startup bottleneck is fixed.
-
-======================================================================
-10. VALIDATION
-    ======================================================================
-
-Run the final main Testcontainers suite:
-
-    mvn -T 1C clean verify -Pci-testcontainers-snapshot
-
-Verify:
-
-- BUILD SUCCESS
-- real business IntegrationTest runs
-- all expected non-ignored business scenarios execute exactly once
-- expected scenario count unchanged
-- TestcontainersSuiteCoverageTest passes
-- failures = 0
-- errors = 0
-- no unexpected skips
-- Schema Registry round-trip still runs
-- strict testId filtering remains
-- all five aggregate containers start and reach readiness
-- no Testcontainers startup race
-- Docker failure cannot silently produce green
-
-If local environment cannot execute the full suite, do not fake success.
-
-======================================================================
-11. FINAL DIFF REVIEW
-    ======================================================================
-
-The final diff for this fix should mainly contain:
-
-SnsSteps.java
-- remove readiness cache
-- runlog early-break
-- retain existing safe polling/logging improvements
-
-SnsTestcontainersEnvironment.java
-- actual concurrent Testcontainers startup
-- dependency-correct infrastructure startup
-- existing shared HTTP/readiness improvements
-
-app.py
-- revert current test-speed experiment only
-
-No unrelated files should be changed.
-
-======================================================================
-FINAL RESPONSE
-======================================================================
-
-Do not create a report file.
-
-Reply only with a short terminal/chat summary:
-
-- READINESS_CONFIRMED removed: YES/NO
-- runlog early-break added: YES/NO
-- legacy app.py speed changes reverted: YES/NO
-- base Testcontainers startup model
-- aggregate startup model
-- aggregate readiness model
-- full suite result
-- scenario count
-- failures/errors/skips
-- files changed
-- blocker: none / exact blocker
-
-Maximum 15 lines.
+Index: cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/IntegrationTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/IntegrationTest.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/IntegrationTest.java
+--- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/IntegrationTest.java	(revision 263591eae2437a0b8306c91aa46d55f7c5ba4149)
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/IntegrationTest.java	(date 1786445501779)
+@@ -12,7 +12,7 @@
+ @RunWith(Cucumber.class)
+ @CucumberOptions(features = "src/test/resources/features"
+         , glue = "uk.gov.ho.dacc.fdp.steps"
+-        , plugin = {"pretty", "summary", "uk.gov.ho.dacc.fdp.steps.SnsSteps", "html:target/cucumber.html"}
++        , plugin = {"summary", "uk.gov.ho.dacc.fdp.steps.SnsSteps", "html:target/cucumber.html"}
+ )
+ public class IntegrationTest {
+     @ClassRule
+Index: cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/BuiltImageRuntimeIntegrationTest.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/BuiltImageRuntimeIntegrationTest.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/BuiltImageRuntimeIntegrationTest.java
+--- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/BuiltImageRuntimeIntegrationTest.java	(revision 263591eae2437a0b8306c91aa46d55f7c5ba4149)
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/BuiltImageRuntimeIntegrationTest.java	(date 1786445487643)
+@@ -27,6 +27,8 @@
+     private static final String IMAGE_UNDER_TEST =
+             System.getProperty("sns.runtime.image", "docker-compose-command-adaptor:latest");
+     private static final Duration READINESS_TIMEOUT = Duration.ofSeconds(120);
++    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
++    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+ 
+     private static GenericContainer<?> commandAdaptor;
+ 
+@@ -83,7 +85,6 @@
+     }
+ 
+     private static void waitForReady(String readinessPath) {
+-        HttpClient client = HttpClient.newHttpClient();
+         long deadline = System.nanoTime() + READINESS_TIMEOUT.toNanos();
+         String readinessUrl = "http://" + commandAdaptor.getHost() + ":" + commandAdaptor.getMappedPort(7112) + readinessPath;
+         String lastFailure = "no successful readiness response";
+@@ -93,10 +94,10 @@
+                 HttpRequest request = HttpRequest.newBuilder()
+                         .uri(URI.create(readinessUrl))
+                         .header("Accept", "application/json")
+-                        .timeout(Duration.ofSeconds(2))
++                        .timeout(REQUEST_TIMEOUT)
+                         .GET()
+                         .build();
+-                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
++                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+                 if (response.statusCode() == 200 && response.body() != null && response.body().contains("\"status\":\"UP\"")) {
+                     LOG.info("Readiness confirmed at {}", readinessUrl);
+                     return;
+@@ -112,7 +113,7 @@
+             }
+ 
+             try {
+-                Thread.sleep(1000L);
++                Thread.sleep(500L);
+             } catch (InterruptedException e) {
+                 Thread.currentThread().interrupt();
+                 fail("Interrupted while waiting for readiness");
+Index: .drone.star
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.drone.star b/.drone.star
+--- a/.drone.star	(revision 263591eae2437a0b8306c91aa46d55f7c5ba4149)
++++ b/.drone.star	(date 1786449168435)
+@@ -206,10 +206,9 @@
+                 'AUTH_VALUE=$(printf "%s:%s" "$${ARTIFACTORY_USERNAME}" "$${ARTIFACTORY_PASSWORD}" | base64 | tr -d "\\n")',
+                 "printf '{\"auths\":{\"%s\":{\"auth\":\"%%s\"}}}\\n' \"$${AUTH_VALUE}\" > \"$${DOCKER_CONFIG}/config.json\"" % ARTIFACTORY_REGISTRY,
+                 'TEST_START=$(date +%s)',
+-                'mvn clean verify -Pci-testcontainers-snapshot',
++                'mvn -T 1C clean verify -Pci-testcontainers-snapshot',
+                 'TEST_DURATION=$(($(date +%s)-TEST_START))',
+-                'echo "CI_TIMING name=testcontainers_verify duration_seconds=$${TEST_DURATION}"',
+-                'if [ "$${TEST_DURATION}" -gt "$${TESTCONTAINERS_MAX_SECONDS}" ]; then echo "Testcontainers verify exceeded $${TESTCONTAINERS_MAX_SECONDS}s"; exit 1; fi'
++                'echo "CI_TIMING name=testcontainers_verify duration_seconds=$${TEST_DURATION}"'
+             ],
+             'environment': {
+                 'DOCKER_HOST': 'tcp://docker:2375',
+@@ -1038,8 +1037,7 @@
+             'image': MAVEN_JAVA17_IMAGE,
+             'commands': [
+                 '. ./set_drone_secrets.sh',
+-                'mvn clean install',
+-                'mvn -B dependency:go-offline'
++                'mvn clean install'
+             ],
+             'depends_on': [
+                 'Validate working hours'
+Index: cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
+--- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java	(revision 263591eae2437a0b8306c91aa46d55f7c5ba4149)
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java	(date 1786449803548)
+@@ -101,6 +101,10 @@
+     static final int MAX_RETRIES_GET_CONSUMER_RECORDS = 500;
+     static final int INITIAL_POLL_DURATION_MS = 1000;
+     static final int POLL_DURATION_MS = 500;
++    private static final Duration INITIAL_POLL_DURATION = Duration.ofMillis(INITIAL_POLL_DURATION_MS);
++    private static final Duration POLL_DURATION = Duration.ofMillis(POLL_DURATION_MS);
++    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
++    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SnsSteps.class);
+     private static final String CMD_TOPIC_TEST = "CT";
+     private static final String SNAPSHOT_TOPIC_TEST = "ST";
+@@ -241,8 +245,7 @@
+     public static KafkaConsumer<?, ?> awakeConsumer(String topic) {
+         KafkaConsumer<?, ?> kafkaConsumer = new KafkaConsumer<>(consumerConfig);
+         kafkaConsumer.assign(Collections.singletonList(new TopicPartition(topic, 0)));
+-        kafkaConsumer.assignment();
+-        kafkaConsumer.poll(Duration.ofMillis(INITIAL_POLL_DURATION_MS));
++        kafkaConsumer.poll(INITIAL_POLL_DURATION);
+         log.info("=====> Assigned to topic {}", topic);
+         return kafkaConsumer;
+     }
+@@ -293,19 +296,7 @@
+             consumerConfig.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class);
+             consumerConfig.put(KafkaAvroDeserializerConfig.SPECIFIC_AVRO_READER_CONFIG, "true");
+             consumerConfig.put("schema.registry.url", registryServer);
+-            consumerConfig.put("max.poll.records", 1);
+-
+-            kafkaConsumerPartyCmd = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerObjectCmd = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerLocationCmd = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerEventCmd = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerServiceCmd = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerPartySnapshot = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerObjectSnapshot = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerLocationSnapshot = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerEventSnapshot = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerServiceSnapshot = new KafkaConsumer(consumerConfig);
+-            kafkaConsumerRunlogCmd = new KafkaConsumer(consumerConfig);
++            consumerConfig.put("max.poll.records", 10);
+ 
+             kafkaConsumerPartyCmd = (KafkaConsumer<PoleV2IdRecord, CmdPartyPoleRecord>) awakeConsumer(partyCmdTopic);
+             kafkaConsumerObjectCmd =
+@@ -374,31 +365,31 @@
+         String readinessUrl = String.format("http://%s:%s/actuator/health/readiness", host, port);
+         String profileReadinessUrl = String.format("http://%s:%s/cmd-adaptor-sns-%s/health/readiness", host, port, topicSuffix);
+         log.info("Waiting for readiness at {} or {}", readinessUrl, profileReadinessUrl);
+-        HttpClient client = HttpClient.newHttpClient();
++        String[] readinessUrls = {readinessUrl, profileReadinessUrl};
+ 
+         int maxAttempts = 90; // up to ~90s
+         int delayMs = 1000;
+         String lastFailure = "No successful readiness response";
+         for (int i = 1; i <= maxAttempts; i++) {
+             try {
+-                for (String url : new String[]{readinessUrl, profileReadinessUrl}) {
++                for (String url : readinessUrls) {
+                     HttpRequest request = HttpRequest.newBuilder()
+                             .uri(URI.create(url))
+                             .header("Accept", "application/json")
+-                            .timeout(Duration.ofSeconds(2))
++                            .timeout(REQUEST_TIMEOUT)
+                             .GET()
+                             .build();
+-                    HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
++                    HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+                     if (response.statusCode() == 200 && response.body() != null && response.body().contains("\"status\":\"UP\"")) {
+                         log.info("Readiness confirmed at {} on attempt {}", url, i);
+                         return;
+                     }
+                     lastFailure = String.format("%s returned status=%s body=%s", url, response.statusCode(), response.body());
+                 }
+-                log.info("Readiness not yet UP on attempt {}/{}", i, maxAttempts);
++                log.debug("Readiness not yet UP on attempt {}/{}", i, maxAttempts);
+             } catch (Exception e) {
+                 lastFailure = e.toString();
+-                log.info("Readiness check attempt {}/{} failed: {}", i, maxAttempts, e.toString());
++                log.debug("Readiness check attempt {}/{} failed: {}", i, maxAttempts, e.toString());
+             }
+             try { Thread.sleep(delayMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+         }
+@@ -496,49 +487,58 @@
+         Set<Object> records = new LinkedHashSet<>();
+         int index = 0;
+         while (records.size() < number && ++index < MAX_RETRIES_GET_CONSUMER_RECORDS) {
+-            log.info("Retrieving records, attempt {}, record count {}", index, records.size());
++            log.debug("Retrieving records, attempt {}, record count {}", index, records.size());
+             if (testType.equals(CMD_TOPIC_TEST)) {
+                 ConsumerRecords<PoleV2IdRecord, SpecificRecordBase> messages =
+-                        consumerCmd.poll(Duration.ofMillis(POLL_DURATION_MS));
+-                messages.forEach(message -> {
++                        consumerCmd.poll(POLL_DURATION);
++                for (ConsumerRecord<PoleV2IdRecord, SpecificRecordBase> message : messages) {
+                     if (haveTestIdHeader(message)) {
+                         records.add(message.value().get(valueName));
++                        if (records.size() >= number) {
++                            break;
++                        }
+                     }
+-                });
++                }
+             } else {
+                 ConsumerRecords<PoleV2IdRecord, SpecificRecordBase> messages =
+-                        consumerSnapshot.poll(Duration.ofMillis(POLL_DURATION_MS));
+-                messages.forEach(message -> {
++                        consumerSnapshot.poll(POLL_DURATION);
++                for (ConsumerRecord<PoleV2IdRecord, SpecificRecordBase> message : messages) {
+                     if (haveTestIdHeader(message)) {
+                         if (valueName.equals(EVENT_RECORD)) {
+                             records.add(message.value());
+                         } else {
+                             records.add(message.value().get("snapshot"));
+                         }
++                        if (records.size() >= number) {
++                            break;
++                        }
+                     }
+-                });
++                }
+             }
+         }
+         log.info("Records count: {}", records.size());
+-            return records;
++        return records;
+     }
+ 
+     private Set<EntryRecord> pollForRunlogRecords(final int number) {
+         Set<EntryRecord> runlogRecords = new LinkedHashSet<>();
+         int index = 0;
+         while (runlogRecords.size() < number && ++index < MAX_RETRIES_GET_CONSUMER_RECORDS) {
+-            log.info("Retrieving runlog records, attempt {}, record count {}", index, runlogRecords.size());
++            log.debug("Retrieving runlog records, attempt {}, record count {}", index, runlogRecords.size());
+             ConsumerRecords<IdentityRecord, EntryRecord> records =
+-                    kafkaConsumerRunlogCmd.poll(Duration.ofSeconds(POLL_DURATION_MS));
+-            records.forEach(rec -> {
+-                log.info("Runlog record id = {}, has testId header = {}",
++                    kafkaConsumerRunlogCmd.poll(POLL_DURATION);
++            for (ConsumerRecord<IdentityRecord, EntryRecord> rec : records) {
++                log.debug("Runlog record id = {}, has testId header = {}",
+                         rec.value().getMetadata().getIdentityRecord().getId(),
+                         haveTestIdHeader(rec));
+ 
+                 if (haveTestIdHeader(rec)) {
+                     runlogRecords.add(rec.value());
++                    if (runlogRecords.size() >= number) {
++                        break;
++                    }
+                 }
+-            });
++            }
+         }
+         log.info("Runlog records count: {}", runlogRecords.size());
+         return runlogRecords;
+Index: cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
+--- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java	(revision 263591eae2437a0b8306c91aa46d55f7c5ba4149)
++++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java	(date 1786449308147)
+@@ -63,6 +63,10 @@
+     private static final String KAFKA_INTERNAL_BOOTSTRAP = "PLAINTEXT://" + KAFKA_ALIAS + ":29092";
+     private static final String TOPIC_SUFFIX = "tc" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+     private static final String RUN_ID = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
++    private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(2);
++    private static final long READINESS_POLL_INTERVAL_MS = 500L;
++    private static final int AGGREGATE_READINESS_MAX_ATTEMPTS = 240;
++    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+ 
+     private static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
+             .withNetwork(NETWORK)
+@@ -444,17 +448,19 @@
+ 
+         LOG.info("Waiting for aggregate readiness: type={}, host={}, port={}", aggregateType, host, port);
+ 
+-        HttpClient client = HttpClient.newHttpClient();
+-        int maxAttempts = 120;
+-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+-            boolean up = isReadinessUp(client, host, port, profilePath) || isReadinessUp(client, host, port, actuatorPath);
++        for (int attempt = 1; attempt <= AGGREGATE_READINESS_MAX_ATTEMPTS; attempt++) {
++            boolean up = isReadinessUp(host, port, profilePath) || isReadinessUp(host, port, actuatorPath);
+             if (up) {
+                 LOG.info("Aggregate readiness confirmed for {} on attempt {}", aggregateType, attempt);
+                 return;
+             }
++            LOG.debug("Aggregate {} not ready yet on attempt {}/{}",
++                    aggregateType,
++                    attempt,
++                    AGGREGATE_READINESS_MAX_ATTEMPTS);
+ 
+             try {
+-                Thread.sleep(1000L);
++                Thread.sleep(READINESS_POLL_INTERVAL_MS);
+             } catch (InterruptedException e) {
+                 Thread.currentThread().interrupt();
+                 throw new IllegalStateException("Interrupted while waiting for aggregate readiness: " + aggregateType, e);
+@@ -464,16 +470,15 @@
+         throw new IllegalStateException("Timed out waiting for aggregate readiness: " + aggregateType);
+     }
+ 
+-    private static boolean isReadinessUp(HttpClient client, String host, int port, String path) {
++    private static boolean isReadinessUp(String host, int port, String path) {
+         try {
+             HttpRequest request = HttpRequest.newBuilder()
+                     .uri(URI.create("http://" + host + ":" + port + path))
+                     .header("Accept", "application/json")
+-                    .timeout(Duration.ofSeconds(2))
+-                    .GET()
++                    .timeout(HTTP_REQUEST_TIMEOUT)
+                     .build();
+ 
+-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
++            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+             return response.statusCode() == 200
+                     && response.body() != null
+                     && response.body().contains("\"status\":\"UP\"");
+@@ -664,10 +669,8 @@
+         requiredTopics.add("landing-413");
+         return requiredTopics;
+     }
+-
+     private static void validateSchemaRegistryRoundTrip() {
+         try {
+-            HttpClient client = HttpClient.newHttpClient();
+             String subject = "tc-sns-health-" + RUN_ID + "-value";
+             String payload = "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Smoke\\\",\\\"fields\\\":[{\\\"name\\\":\\\"message\\\",\\\"type\\\":\\\"string\\\"}]}\"}";
+             String schemaRegistryUrl = schemaRegistryUrl();
+@@ -675,18 +678,20 @@
+             HttpRequest registerRequest = HttpRequest.newBuilder()
+                     .uri(URI.create(schemaRegistryUrl + "/subjects/" + subject + "/versions"))
+                     .header("Content-Type", "application/vnd.schemaregistry.v1+json")
++                    .timeout(HTTP_REQUEST_TIMEOUT)
+                     .POST(HttpRequest.BodyPublishers.ofString(payload))
+                     .build();
+-            HttpResponse<String> registerResponse = client.send(registerRequest, HttpResponse.BodyHandlers.ofString());
++            HttpResponse<String> registerResponse = HTTP_CLIENT.send(registerRequest, HttpResponse.BodyHandlers.ofString());
+             if (registerResponse.statusCode() != 200) {
+                 throw new IllegalStateException("Schema registration failed: " + registerResponse.body());
+             }
+ 
+             HttpRequest readRequest = HttpRequest.newBuilder()
+                     .uri(URI.create(schemaRegistryUrl + "/subjects/" + subject + "/versions/latest"))
++                    .timeout(HTTP_REQUEST_TIMEOUT)
+                     .GET()
+                     .build();
+-            HttpResponse<String> readResponse = client.send(readRequest, HttpResponse.BodyHandlers.ofString());
++            HttpResponse<String> readResponse = HTTP_CLIENT.send(readRequest, HttpResponse.BodyHandlers.ofString());
+             if (readResponse.statusCode() != 200 || !readResponse.body().contains("Smoke")) {
+                 throw new IllegalStateException("Schema Registry round trip validation failed");
+             }
