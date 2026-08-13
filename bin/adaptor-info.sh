@@ -6,11 +6,26 @@
 # See https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
 #############################################################################
 
-echo "| Aggregator Core | $(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=aggregator-core.version -q -DforceStdout) |"
-echo "| FDP BOM | $(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=fdp-bom.version -q -DforceStdout) |"
+MAVEN_REPO_LOCAL="${MAVEN_REPO_LOCAL:-.m2}"
 
-CDLZ_AVRO_SCHEMAS_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=cdlz-avro-schemas.version -q -DforceStdout)"
-[[ "$CDLZ_AVRO_SCHEMAS_VERSION" == "null object or invalid expression" ]] && CDLZ_AVRO_SCHEMAS_VERSION='N/A'
+# shellcheck disable=SC2016
+POM_PROPERTIES=$(
+  echo '${aggregator-core.version}:${fdp-bom.version}:${cdlz-avro-schemas.version}:${fdp-commons.version}' |
+	mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate \
+	  -N \
+	  -q \
+	  -DforceStdout \
+	  -Dmaven.repo.local="$MAVEN_REPO_LOCAL"
+)
+
+AGGREGATOR_CORE_VERSION=$(echo "$POM_PROPERTIES" | cut -d: -f1)
+FDP_BOM_VERSION=$(echo "$POM_PROPERTIES" | cut -d: -f2)
+CDLZ_AVRO_SCHEMAS_VERSION=$(echo "$POM_PROPERTIES" | cut -d: -f3)
+FDP_COMMONS_VERSION=$(echo "$POM_PROPERTIES" | cut -d: -f4)
+
+[ "$CDLZ_AVRO_SCHEMAS_VERSION" = "null object or invalid expression" ] && CDLZ_AVRO_SCHEMAS_VERSION='N/A'
+
+echo "| Aggregator Core | ${AGGREGATOR_CORE_VERSION} |"
+echo "| FDP BOM | ${FDP_BOM_VERSION} |"
 echo "| CDLZ Avro Schemas | ${CDLZ_AVRO_SCHEMAS_VERSION} |"
-
-echo "| FDP Commons | $(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=fdp-commons.version -q -DforceStdout) |"
+echo "| FDP Commons | ${FDP_COMMONS_VERSION} |"

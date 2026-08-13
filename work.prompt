@@ -1,0 +1,461 @@
+Optimise the SNS CI pipeline by moving Trivy database preparation off the
+critical path, while preserving the exact same final Trivy security scan.
+
+This is a FOCUSED IMPLEMENTATION + A/B MEASUREMENT task.
+
+Do NOT:
+- change Trivy security coverage
+- disable secret scanning
+- change severity filters
+- change --ignore-unfixed
+- change --exit-code policy
+- skip DB freshness/update checks
+- remove the final Trivy image scan
+- create reports/markdown/benchmark files
+- change Testcontainers
+- change Maven test behaviour
+- change the existing Extract Adaptor Information optimisation
+- refactor unrelated pipeline code
+
+======================================================================
+CURRENT STATE
+======================================================================
+
+Current representative CI run:
+
+    Overall CI                         5:02
+    Extract Adaptor Information        0:11
+    Build/Test with Testcontainers     3:10
+    Build image                        0:20
+    Runtime validation                 0:30
+    Trivy                              0:43
+
+The current Trivy log shows:
+
+    21:34:56 vulnerability DB download starts
+    21:35:00 vulnerability DB downloaded
+
+    21:35:08 Java DB download starts
+    21:35:28 Java DB downloaded
+
+So approximately 24 seconds of DB download/update work is still occurring
+inside the final Trivy step.
+
+The actual vulnerability analysis begins only after those DB operations.
+
+Goal:
+
+    perform Trivy DB preparation earlier and concurrently with useful CI work
+
+so that the final Trivy image scan can reuse the already-prepared DB cache.
+
+======================================================================
+1. INSPECT CURRENT DRONE EXECUTION MODEL
+======================================================================
+
+Inspect CURRENT:
+
+    .drone.star
+
+Determine:
+
+- how steps depend on each other
+- which steps can run in parallel
+- workspace path
+- whether workspace files are visible between steps
+- existing Maven cache/workspace-sharing patterns
+- whether Trivy binary is available only in the final scan step or can be used
+  in another compatible step/container
+- whether the current Trivy step uses a dedicated container image
+- whether a shared workspace directory can safely hold Trivy cache
+
+Do not change code before this is understood.
+
+======================================================================
+2. KEEP EXISTING EXTRACT ADAPTOR OPTIMISATION
+======================================================================
+
+Do NOT revert or modify the current Extract Adaptor Information optimisation
+unless strictly required by a dependency conflict.
+
+It currently:
+
+- avoids unnecessary repeated Maven evaluation
+- runs independently where possible
+- has demonstrated a representative ~11 second step
+
+This task is only about Trivy DB preparation.
+
+======================================================================
+3. USE PIPELINE-LOCAL CACHE, NOT CROSS-BUILD CACHE
+======================================================================
+
+Do NOT require persistent cache across different Drone builds.
+
+The preferred model is pipeline-local:
+
+    one early step prepares the Trivy cache
+        ->
+    cache directory lives in shared Drone workspace
+        ->
+    final Trivy step reuses it in the SAME pipeline
+
+This avoids platform-level persistent-cache assumptions.
+
+Use a workspace path such as:
+
+    <workspace>/.cache/trivy
+
+ONLY after verifying the correct repository/workspace path.
+
+Set:
+
+    TRIVY_CACHE_DIR
+
+or:
+
+    --cache-dir
+
+consistently in BOTH preparation and final scan.
+
+Do not rely on Trivy's default home directory if step containers do not share it.
+
+======================================================================
+4. CREATE AN EARLY TRIVY DB PREPARATION STEP
+======================================================================
+
+Add the smallest possible dedicated CI step whose only purpose is to prepare
+the Trivy databases/cache.
+
+It should start as early as safely possible.
+
+Preferred dependency point:
+
+    after required repository/secrets/platform setup
+
+but it should NOT wait for:
+
+    Build/Test with Testcontainers
+
+The intended topology is conceptually:
+
+    Retrieve Artifactory Secrets
+             |
+             +--------------------+
+             |                    |
+      Wait for Docker       Prepare Trivy DB
+             |                    |
+      Extract / Build-Test        |
+             |                    |
+             +--------------------+
+                      |
+                Build image
+                      |
+              Runtime validation
+                      |
+              Final Trivy scan
+
+Do not blindly copy this exact graph.
+
+Use the actual current step dependencies.
+
+======================================================================
+5. PREPARE BOTH DATABASES
+======================================================================
+
+The preparation must cover BOTH:
+
+- standard vulnerability DB
+- Java DB
+
+using the SAME repositories currently configured:
+
+    --db-repository
+    --java-db-repository
+
+Do NOT use public upstream DBs if the pipeline currently uses internal mirrors.
+
+Do NOT change repository endpoints.
+
+======================================================================
+6. USE SUPPORTED TRIVY DB COMMANDS
+======================================================================
+
+Inspect the exact installed Trivy version:
+
+    0.72.0
+
+and use supported commands/options for that version.
+
+Prefer official Trivy DB-only preparation behaviour if available.
+
+Possible approaches to inspect include:
+
+    trivy image --download-db-only
+    trivy image --download-java-db-only
+
+or the correct equivalent supported by the installed version.
+
+Do NOT assume exact syntax.
+
+Run:
+
+    trivy --help
+    trivy image --help
+
+or inspect the installed binary help locally.
+
+If separate commands are required for vulnerability DB and Java DB, run them
+inside the same preparation step.
+
+======================================================================
+7. PARALLELISE DB DOWNLOADS ONLY IF SAFE
+======================================================================
+
+If Trivy supports preparing the two databases independently and concurrent
+writes to the same cache are safe, evaluate parallel download.
+
+Do NOT assume that two Trivy processes writing to the same cache directory are
+safe.
+
+Default to sequential DB preparation INSIDE the early step if there is any
+cache-lock/corruption risk.
+
+The important optimisation is:
+
+    DB preparation step runs parallel to Maven/Testcontainers work
+
+not necessarily that the two DB downloads themselves run concurrently.
+
+======================================================================
+8. FINAL TRIVY SCAN MUST USE THE PREPARED CACHE
+======================================================================
+
+The final existing command must remain functionally equivalent to:
+
+    trivy image \
+      --exit-code 0 \
+      --no-progress \
+      docker-compose-command-adaptor:latest \
+      --severity CRITICAL,HIGH \
+      --ignore-unfixed \
+      --db-repository <internal-db> \
+      --java-db-repository <internal-java-db>
+
+Add only the cache wiring needed to reuse the prepared databases.
+
+The final scan must still perform:
+
+- vulnerability scanning
+- secret scanning
+- OS package analysis
+- JAR analysis
+- Go binary analysis
+- the same result/report output
+
+Do NOT add:
+
+    --skip-db-update
+    --skip-java-db-update
+
+unless inspection proves Trivy requires one of these ONLY to reuse an already
+freshly prepared cache in the SAME pipeline.
+
+If such a flag is necessary:
+
+- prove that the prep step successfully refreshed/validated the DB first
+- ensure the final scan cannot run unless prep succeeded
+- document only in final terminal response, not a file
+
+Preferred outcome is that normal Trivy cache metadata causes the final scan to
+reuse the fresh DB automatically.
+
+======================================================================
+9. FAILURE SEMANTICS
+======================================================================
+
+The DB preparation step must NOT be optional.
+
+If required vulnerability databases cannot be prepared:
+
+    pipeline should fail
+
+Do not silently continue to a final scan with missing/stale data.
+
+The final Trivy scan must depend on successful DB preparation.
+
+Do not create false-green security behaviour.
+
+======================================================================
+10. DO NOT SERIALISE THE PIPELINE
+======================================================================
+
+This is critical.
+
+Do NOT implement:
+
+    Prepare Trivy DB
+        ->
+    Build/Test
+        ->
+    Build image
+        ->
+    Trivy
+
+That would just move the same ~24 seconds earlier.
+
+The prep step must overlap with existing long-running work.
+
+The main target is:
+
+    Trivy DB download happens while Build/Test (~3:10) is already running.
+
+======================================================================
+11. VERIFY CACHE REUSE FROM LOGS
+======================================================================
+
+In the final Trivy step, inspect logs carefully.
+
+Success signal:
+
+The final scan should NOT again spend time equivalent to:
+
+    Downloading vulnerability DB...
+    Downloading Java DB...
+
+after the prep step already completed.
+
+If final scan downloads both DBs again:
+
+    implementation is NOT working
+
+Investigate:
+
+- wrong cache path
+- cache not shared
+- different container filesystem
+- metadata/path mismatch
+- different Trivy user/home
+- preparation command storing DB elsewhere
+
+Do not keep a non-working prep step.
+
+======================================================================
+12. MEASURE THE PREP STEP AND FINAL SCAN SEPARATELY
+======================================================================
+
+Record from CI UI/logs:
+
+    Prepare Trivy DB step duration
+    Final Trivy scan duration
+    Overall CI duration
+
+Important:
+
+The prep step may still take ~20–30 seconds.
+
+That is acceptable IF it overlaps Build/Test and therefore does not add to
+overall critical-path duration.
+
+Do NOT judge success by summing visible parallel step durations.
+
+Judge:
+
+    overall CI wall-clock
+
+======================================================================
+13. RUN TWICE
+======================================================================
+
+Run full Drone CI twice if possible.
+
+Reference:
+
+    representative overall CI     5:02
+    Trivy final step              ~0:43
+
+For each run record:
+
+    Prepare DB duration
+    Build/Test duration
+    final Trivy duration
+    overall CI duration
+
+Expected evidence of success:
+
+    final Trivy no longer performs ~24s DB downloads
+
+and:
+
+    overall CI falls reproducibly below or near 5:00
+
+Do NOT claim exact savings before measurement.
+
+======================================================================
+14. KEEP / REVERT RULE
+======================================================================
+
+KEEP only if:
+
+- security coverage is unchanged
+- DB freshness/update semantics are preserved
+- final scan uses same image and same scan options
+- prep genuinely overlaps useful work
+- final Trivy DB redownload disappears
+- full pipeline remains green
+- overall wall-clock improves reproducibly
+
+REVERT completely if:
+
+- final Trivy still downloads DBs
+- prep serialises the pipeline
+- security semantics weaken
+- cache sharing is unreliable
+- overall wall-clock does not improve
+
+======================================================================
+15. FINAL DIFF HYGIENE
+======================================================================
+
+Run:
+
+    git diff
+    git status
+
+Expected likely file:
+
+    .drone.star
+
+Do NOT add:
+- scripts unless absolutely necessary
+- cache contents
+- generated files
+- reports
+- docs
+- timing artefacts
+- unrelated changes
+
+Prefer a small .drone.star-only implementation.
+
+======================================================================
+FINAL RESPONSE
+======================================================================
+
+Reply only in terminal/chat, maximum 16 lines:
+
+- Trivy cache path
+- preparation command(s)
+- prep step dependency
+- prep overlaps Build/Test: YES/NO
+- vulnerability DB prepared: YES/NO
+- Java DB prepared: YES/NO
+- final scan redownloaded vulnerability DB: YES/NO
+- final scan redownloaded Java DB: YES/NO
+- security coverage changed: YES/NO
+- DB freshness semantics preserved: YES/NO
+- prep step duration run 1/run 2
+- final Trivy before
+- final Trivy run 1/run 2
+- overall before
+- overall run 1/run 2
+- files changed + kept/reverted

@@ -185,10 +185,12 @@ def ci_pipeline(ctx):
             'image': MAVEN_JAVA17_IMAGE,
             'commands': [
                 '. ./set_drone_secrets.sh',
+                'export MAVEN_REPO_LOCAL="$${PWD}/.m2/repository"',
+                'mkdir -p "$${MAVEN_REPO_LOCAL}"',
                 './bin/adaptor-info.sh'
             ],
             'depends_on': [
-                'Wait for Docker'
+                'Retrieve Artifactory Secrets'
             ]
         }
     )
@@ -217,10 +219,10 @@ def ci_pipeline(ctx):
                 'DOCKER_API_VERSION': '1.41',
                 'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
                 'TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX': 'docker.digital.homeoffice.gov.uk/',
-                'TESTCONTAINERS_RYUK_DISABLED': 'true',
-                'SNS_KAFKA_CONFIG_LOG_LEVEL': 'WARN'
+                'TESTCONTAINERS_RYUK_DISABLED': 'true'
             },
             'depends_on': [
+                'Wait for Docker',
                 'Extract Adaptor Information'
             ]
         }

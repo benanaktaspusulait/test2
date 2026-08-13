@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <property name="SNS_KAFKA_CONFIG_LOG_LEVEL" value="${sns.kafka.config.log.level:-INFO}"/>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <layout class="ch.qos.logback.classic.PatternLayout">
             <Pattern>
@@ -8,15 +7,6 @@
             </Pattern>
         </layout>
     </appender>
-
-    <logger name="io.confluent.kafka.serializers.KafkaAvroSerializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
-    <logger name="io.confluent.kafka.serializers.KafkaAvroDeserializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
-    <logger name="org.apache.kafka.common.config" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
-    <logger name="org.apache.kafka.clients" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
-    <logger name="org.apache.kafka.streams.StreamsConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
-    <logger name="org.apache.kafka.clients.admin.AdminClientConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
-    <logger name="org.apache.kafka.clients.consumer.ConsumerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
-    <logger name="org.apache.kafka.clients.producer.ProducerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
 
     <root level="info">
         <appender-ref ref="STDOUT"/>
