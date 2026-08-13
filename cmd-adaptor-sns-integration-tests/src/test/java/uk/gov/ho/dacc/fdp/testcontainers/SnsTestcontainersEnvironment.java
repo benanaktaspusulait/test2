@@ -13,6 +13,7 @@ import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.images.RemoteDockerImage;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.DockerImageName;
@@ -51,6 +52,8 @@ public final class SnsTestcontainersEnvironment {
             Boolean.parseBoolean(System.getProperty("sns.testcontainers.skip-if-docker-unavailable", "true"));
     private static final boolean AGGREGATORS_ENABLED =
             Boolean.parseBoolean(System.getProperty("sns.testcontainers.aggregators.enabled", "false"));
+    private static final int EXPECTED_SCENARIOS =
+            Integer.parseInt(System.getProperty("sns.testcontainers.expected-scenarios", "0"));
 
     private static final String KAFKA_ALIAS = "kafka";
     private static final String ZOOKEEPER_ALIAS = "zookeeper";
@@ -116,6 +119,7 @@ public final class SnsTestcontainersEnvironment {
     private static volatile boolean redisStarted = false;
     private static volatile boolean messagingStarted = false;
     private static volatile boolean applicationStarted = false;
+    private static volatile boolean aggregatorsStarted = false;
     private static volatile boolean networkClosed = false;
     private static volatile boolean dockerAvailabilityChecked = false;
     private static volatile RuntimeException infrastructureStartupFailure;
@@ -128,6 +132,13 @@ public final class SnsTestcontainersEnvironment {
     public static synchronized void assumeDockerAvailableIfEnabled() {
         if (!TESTCONTAINERS_ENABLED || dockerAvailabilityChecked) {
             return;
+        }
+
+        if (System.getenv("DRONE") != null && EXPECTED_SCENARIOS > 0 && SKIP_IF_DOCKER_UNAVAILABLE) {
+            throw new IllegalStateException(
+                    "CI Testcontainers suite is misconfigured: sns.testcontainers.skip-if-docker-unavailable=true "
+                            + "while expected scenarios are " + EXPECTED_SCENARIOS + ". "
+                            + "Mandatory CI runs must fail when Docker is unavailable.");
         }
 
         String message = "SNS Testcontainers integration tests require a reachable Docker daemon with a supported "
@@ -151,9 +162,7 @@ public final class SnsTestcontainersEnvironment {
     }
 
     public static synchronized void startInfrastructure() {
-        if (networkClosed) {
-            throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
-        }
+        assertEnvironmentOpen();
         assumeDockerAvailableIfEnabled();
         if (messagingStarted) {
             return;
@@ -164,6 +173,7 @@ public final class SnsTestcontainersEnvironment {
 
         LOG.info("Starting SNS Testcontainers infrastructure");
         try {
+            verifyRequiredDependencyImagesResolvable();
             Startables.deepStart(Stream.of(REDIS, ZOOKEEPER).filter(container -> !container.isRunning())).join();
             redisStarted = true;
             KAFKA.start();
@@ -283,6 +293,7 @@ public final class SnsTestcontainersEnvironment {
         stopContainer(AGGREGATE_LOCATION);
         stopContainer(AGGREGATE_OBJECT);
         stopContainer(AGGREGATE_PARTY);
+        aggregatorsStarted = false;
 
         if (SCHEMA_REGISTRY.isRunning()) {
             SCHEMA_REGISTRY.stop();
@@ -489,6 +500,14 @@ public final class SnsTestcontainersEnvironment {
             return;
         }
 
+        startAggregators();
+    }
+
+    public static synchronized void startAggregators() {
+        if (aggregatorsStarted) {
+            return;
+        }
+
         LOG.info("Starting SNS downstream aggregate containers for snapshot scenarios in parallel");
         Startables.deepStart(Stream.of(
                 AGGREGATE_PARTY,
@@ -505,6 +524,8 @@ public final class SnsTestcontainersEnvironment {
                 Map.entry(AGGREGATE_SERVICE, "service"))
                 .parallel()
                 .forEach(entry -> waitForAggregateReadiness(entry.getKey(), entry.getValue()));
+
+        aggregatorsStarted = true;
     }
 
     private static void waitForAggregateReadiness(GenericContainer<?> container, String aggregateType) {
@@ -521,9 +542,11 @@ public final class SnsTestcontainersEnvironment {
                 LOG.info("Aggregate readiness confirmed for {} on attempt {}", aggregateType, attempt);
                 return;
             }
-
             LOG.debug("Aggregate {} not ready yet on attempt {}/{}",
-                    aggregateType, attempt, AGGREGATE_READINESS_MAX_ATTEMPTS);
+                    aggregateType,
+                    attempt,
+                    AGGREGATE_READINESS_MAX_ATTEMPTS);
+
             try {
                 Thread.sleep(READINESS_POLL_INTERVAL_MS);
             } catch (InterruptedException e) {
@@ -556,6 +579,20 @@ public final class SnsTestcontainersEnvironment {
     private static void stopContainer(GenericContainer<?> container) {
         if (container.isRunning()) {
             container.stop();
+        }
+    }
+
+    private static void verifyRequiredDependencyImagesResolvable() {
+        List<String> requiredImages = List.of(REDIS_IMAGE, ZOOKEEPER_IMAGE, KAFKA_IMAGE, SCHEMA_REGISTRY_IMAGE);
+        for (String requiredImage : requiredImages) {
+            try {
+                new RemoteDockerImage(DockerImageName.parse(requiredImage)).get();
+            } catch (RuntimeException e) {
+                throw new IllegalStateException(
+                        "Unable to resolve required dependency image before startup: " + requiredImage
+                                + ". Check Testcontainers image mapping and approved registry path configuration.",
+                        e);
+            }
         }
     }
 
@@ -721,7 +758,6 @@ public final class SnsTestcontainersEnvironment {
         requiredTopics.add("landing-413");
         return requiredTopics;
     }
-
     private static void validateSchemaRegistryRoundTrip() {
         try {
             String subject = "tc-sns-health-" + RUN_ID + "-value";

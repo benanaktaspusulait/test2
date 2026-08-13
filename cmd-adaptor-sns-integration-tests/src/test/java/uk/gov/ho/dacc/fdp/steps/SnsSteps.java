@@ -192,6 +192,9 @@ public class SnsSteps implements EventListener {
 
             if (TESTCONTAINERS_ENABLED) {
                 SnsTestcontainersEnvironment.startApplication();
+                if (shouldStartAggregatorsForSelectedScenarios()) {
+                    SnsTestcontainersEnvironment.startAggregators();
+                }
 
                 String bootstrap = SnsTestcontainersEnvironment.getKafkaBootstrapServers().replace("PLAINTEXT://", "");
                 properties.put(BOOTSTRAP_SERVER_HOST_PROPERTY, bootstrap.substring(0, bootstrap.lastIndexOf(':')));
@@ -210,6 +213,14 @@ public class SnsSteps implements EventListener {
             logLoadedProperties();
             RUNTIME_INITIALIZED.set(true);
         }
+    }
+
+    private static boolean shouldStartAggregatorsForSelectedScenarios() {
+        String cucumberFilterTags = System.getProperty("cucumber.filter.tags", "").trim();
+        boolean commandOnlyRun = cucumberFilterTags.contains("@cmd")
+                && !cucumberFilterTags.contains("not @cmd")
+                && !cucumberFilterTags.contains(" or ");
+        return !commandOnlyRun;
     }
 
     private static void configureTopicNames(String suffix) {

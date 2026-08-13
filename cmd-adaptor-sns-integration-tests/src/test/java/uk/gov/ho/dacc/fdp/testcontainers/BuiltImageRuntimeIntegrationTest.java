@@ -61,6 +61,7 @@ class BuiltImageRuntimeIntegrationTest {
         }
     }
 
+
     @AfterAll
     static void afterAll() {
         if (commandAdaptor != null && commandAdaptor.isRunning()) {
@@ -139,3 +140,4 @@ class BuiltImageRuntimeIntegrationTest {
         }
     }
 }
+

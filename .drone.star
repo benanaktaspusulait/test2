@@ -181,6 +181,23 @@ def ci_pipeline(ctx):
     response = add_pipeline_step(
         response,
         {
+            'name': 'Prepare Trivy DB',
+            'image': TRIVY_IMAGE,
+            'commands': [
+                'export TRIVY_CACHE_DIR="$${PWD}/.cache/trivy"',
+                'mkdir -p "$${TRIVY_CACHE_DIR}"',
+                'trivy image --download-db-only --no-progress --cache-dir "$${TRIVY_CACHE_DIR}" --db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db',
+                'trivy image --download-java-db-only --no-progress --cache-dir "$${TRIVY_CACHE_DIR}" --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db'
+            ],
+            'depends_on': [
+                'Retrieve Artifactory Secrets'
+            ]
+        }
+    )
+
+    response = add_pipeline_step(
+        response,
+        {
             'name': 'Extract Adaptor Information',
             'image': MAVEN_JAVA17_IMAGE,
             'commands': [
@@ -210,7 +227,7 @@ def ci_pipeline(ctx):
                 'export MAVEN_REPO_LOCAL="$${PWD}/.m2/repository"',
                 'mkdir -p "$${MAVEN_REPO_LOCAL}"',
                 'TEST_START=$(date +%s)',
-                'DOCKER_API_VERSION=1.41 mvn -Ddocker.api.version=1.41 -DDOCKER_API_VERSION=1.41 -Dmaven.repo.local="$${MAVEN_REPO_LOCAL}" clean verify -Pci-testcontainers-snapshot,ci-local-install-artifacts',
+                'mvn -Dmaven.repo.local="$${MAVEN_REPO_LOCAL}" clean verify -Pci-testcontainers-snapshot,ci-local-install-artifacts',
                 'TEST_DURATION=$(($(date +%s)-TEST_START))',
                 'echo "CI_TIMING name=testcontainers_verify duration_seconds=$${TEST_DURATION}"'
             ],
@@ -218,7 +235,6 @@ def ci_pipeline(ctx):
                 'DOCKER_HOST': 'tcp://docker:2375',
                 'DOCKER_API_VERSION': '1.41',
                 'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
-                'TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX': 'docker.digital.homeoffice.gov.uk/',
                 'TESTCONTAINERS_RYUK_DISABLED': 'true'
             },
             'depends_on': [
@@ -268,13 +284,12 @@ def ci_pipeline(ctx):
                 "printf '{\"auths\":{\"%s\":{\"auth\":\"%%s\"}}}\\n' \"$${AUTH_VALUE}\" > \"$${DOCKER_CONFIG}/config.json\"" % ARTIFACTORY_REGISTRY,
                 'export MAVEN_REPO_LOCAL="$${PWD}/.m2/repository"',
                 'mkdir -p "$${MAVEN_REPO_LOCAL}"',
-                'DOCKER_API_VERSION=1.41 mvn -Ddocker.api.version=1.41 -DDOCKER_API_VERSION=1.41 -Dmaven.repo.local="$${MAVEN_REPO_LOCAL}" -pl cmd-adaptor-sns-integration-tests verify -Pci-built-image-runtime-smoke -Dsns.runtime.image=docker-compose-command-adaptor:latest'
+                'mvn -Dmaven.repo.local="$${MAVEN_REPO_LOCAL}" -pl cmd-adaptor-sns-integration-tests verify -Pci-built-image-runtime-smoke -Dsns.runtime.image=docker-compose-command-adaptor:latest'
             ],
             'environment': {
                 'DOCKER_HOST': 'tcp://docker:2375',
                 'DOCKER_API_VERSION': '1.41',
                 'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
-                'TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX': 'docker.digital.homeoffice.gov.uk/',
                 'TESTCONTAINERS_RYUK_DISABLED': 'true'
             },
             'depends_on': [
@@ -306,11 +321,14 @@ def ci_pipeline(ctx):
         {
             'name': 'Scan with Trivy',
             'depends_on': [
-                'Validate Built Image Runtime'
+                'Validate Built Image Runtime',
+                'Prepare Trivy DB'
             ],
             'commands': [
                 # PM-75944: updated application to use ecr trivy db
-                'trivy image --exit-code 0 --no-progress docker-compose-command-adaptor:latest --severity CRITICAL,HIGH --ignore-unfixed --db-repository  acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db'
+                'export TRIVY_CACHE_DIR="$${PWD}/.cache/trivy"',
+                'mkdir -p "$${TRIVY_CACHE_DIR}"',
+                'trivy image --exit-code 0 --no-progress --cache-dir "$${TRIVY_CACHE_DIR}" docker-compose-command-adaptor:latest --severity CRITICAL,HIGH --ignore-unfixed --db-repository  acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db'
             ],
             'image': TRIVY_IMAGE,
             'environment': {
@@ -1428,7 +1446,6 @@ def main(ctx):
                 )
         else:
             pipelines.append(ci_pipeline(ctx))
-
     elif ctx.build.event == 'pull_request':
         pipelines.append(blank_pipeline('GitLab MR'))
     elif ctx.build.event == 'tag':

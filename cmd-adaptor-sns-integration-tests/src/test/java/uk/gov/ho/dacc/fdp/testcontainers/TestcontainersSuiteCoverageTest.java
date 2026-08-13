@@ -40,3 +40,4 @@ class TestcontainersSuiteCoverageTest {
                 "Testcontainers suite must include at least " + MINIMUM_SCENARIO_COUNT + " scenarios");
     }
 }
+

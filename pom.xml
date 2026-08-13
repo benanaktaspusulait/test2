@@ -156,7 +156,6 @@
         </dependency>
     </dependencies>
 
-
     <profiles>
         <profile>
             <id>ci-local-install-artifacts</id>
@@ -169,7 +168,9 @@
                             <execution>
                                 <id>install-reactor-artifacts-at-verify</id>
                                 <phase>verify</phase>
-                                <goals><goal>install</goal></goals>
+                                <goals>
+                                    <goal>install</goal>
+                                </goals>
                             </execution>
                         </executions>
                     </plugin>
@@ -177,6 +178,7 @@
             </build>
         </profile>
     </profiles>
+
 
     <repositories>
         <repository>
