@@ -17,9 +17,10 @@ RUN yum install -y \
     && yum erase -y vim-data \
     && yum clean all \
     && rm -rf /var/cache/yum \
-    && curl --silent --output /tmp/envconsul.zip https://releases.hashicorp.com/envconsul/0.13.1/envconsul_0.13.1_linux_amd64.zip \
-    && unzip envconsul.zip \
-    && rm -f envconsul.zip \
+    && curl --fail --silent --show-error --location --output /tmp/envconsul.zip https://releases.hashicorp.com/envconsul/0.13.4/envconsul_0.13.4_linux_amd64.zip \
+    && echo "53656bd797ea7e1b91459edfc072613e3a229ede5bd8619465cf961ec450fdc5  /tmp/envconsul.zip" | sha256sum --check --status - \
+    && unzip /tmp/envconsul.zip \
+    && rm -f /tmp/envconsul.zip \
     && mv envconsul /usr/local/bin/envconsul \
     && chown root:root /usr/local/bin/envconsul \
     && chmod 0755 /usr/local/bin/envconsul \
