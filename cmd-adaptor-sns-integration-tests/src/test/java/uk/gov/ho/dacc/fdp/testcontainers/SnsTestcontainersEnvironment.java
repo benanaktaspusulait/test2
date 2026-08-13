@@ -60,6 +60,10 @@ public final class SnsTestcontainersEnvironment {
     private static final String KAFKA_INTERNAL_BOOTSTRAP = "PLAINTEXT://" + KAFKA_ALIAS + ":29092";
     private static final String TOPIC_SUFFIX = "tc" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     private static final String RUN_ID = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+    private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(2);
+    private static final long READINESS_POLL_INTERVAL_MS = 500L;
+    private static final int AGGREGATE_READINESS_MAX_ATTEMPTS = 240;
+    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
     private static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
             .withNetwork(NETWORK)
@@ -423,17 +427,17 @@ public final class SnsTestcontainersEnvironment {
 
         LOG.info("Waiting for aggregate readiness: type={}, host={}, port={}", aggregateType, host, port);
 
-        HttpClient client = HttpClient.newHttpClient();
-        int maxAttempts = 120;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            boolean up = isReadinessUp(client, host, port, profilePath) || isReadinessUp(client, host, port, actuatorPath);
+        for (int attempt = 1; attempt <= AGGREGATE_READINESS_MAX_ATTEMPTS; attempt++) {
+            boolean up = isReadinessUp(host, port, profilePath) || isReadinessUp(host, port, actuatorPath);
             if (up) {
                 LOG.info("Aggregate readiness confirmed for {} on attempt {}", aggregateType, attempt);
                 return;
             }
 
+            LOG.debug("Aggregate {} not ready yet on attempt {}/{}",
+                    aggregateType, attempt, AGGREGATE_READINESS_MAX_ATTEMPTS);
             try {
-                Thread.sleep(1000L);
+                Thread.sleep(READINESS_POLL_INTERVAL_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Interrupted while waiting for aggregate readiness: " + aggregateType, e);
@@ -443,16 +447,16 @@ public final class SnsTestcontainersEnvironment {
         throw new IllegalStateException("Timed out waiting for aggregate readiness: " + aggregateType);
     }
 
-    private static boolean isReadinessUp(HttpClient client, String host, int port, String path) {
+    private static boolean isReadinessUp(String host, int port, String path) {
         try {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("http://" + host + ":" + port + path))
-                    .header("Accept", "application/json")
-                    .timeout(Duration.ofSeconds(2))
                     .GET()
+                    .header("Accept", "application/json")
+                    .timeout(HTTP_REQUEST_TIMEOUT)
                     .build();
 
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
             return response.statusCode() == 200
                     && response.body() != null
                     && response.body().contains("\"status\":\"UP\"");
@@ -632,7 +636,6 @@ public final class SnsTestcontainersEnvironment {
 
     private static void validateSchemaRegistryRoundTrip() {
         try {
-            HttpClient client = HttpClient.newHttpClient();
             String subject = "tc-sns-health-" + RUN_ID + "-value";
             String payload = "{\"schema\":\"{\\\"type\\\":\\\"record\\\",\\\"name\\\":\\\"Smoke\\\",\\\"fields\\\":[{\\\"name\\\":\\\"message\\\",\\\"type\\\":\\\"string\\\"}]}\"}";
             String schemaRegistryUrl = schemaRegistryUrl();
@@ -640,18 +643,20 @@ public final class SnsTestcontainersEnvironment {
             HttpRequest registerRequest = HttpRequest.newBuilder()
                     .uri(URI.create(schemaRegistryUrl + "/subjects/" + subject + "/versions"))
                     .header("Content-Type", "application/vnd.schemaregistry.v1+json")
+                    .timeout(HTTP_REQUEST_TIMEOUT)
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
-            HttpResponse<String> registerResponse = client.send(registerRequest, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> registerResponse = HTTP_CLIENT.send(registerRequest, HttpResponse.BodyHandlers.ofString());
             if (registerResponse.statusCode() != 200) {
                 throw new IllegalStateException("Schema registration failed: " + registerResponse.body());
             }
 
             HttpRequest readRequest = HttpRequest.newBuilder()
                     .uri(URI.create(schemaRegistryUrl + "/subjects/" + subject + "/versions/latest"))
+                    .timeout(HTTP_REQUEST_TIMEOUT)
                     .GET()
                     .build();
-            HttpResponse<String> readResponse = client.send(readRequest, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> readResponse = HTTP_CLIENT.send(readRequest, HttpResponse.BodyHandlers.ofString());
             if (readResponse.statusCode() != 200 || !readResponse.body().contains("Smoke")) {
                 throw new IllegalStateException("Schema Registry round trip validation failed");
             }

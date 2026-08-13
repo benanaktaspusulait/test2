@@ -101,6 +101,10 @@ public class SnsSteps implements EventListener {
     static final int MAX_RETRIES_GET_CONSUMER_RECORDS = 500;
     static final int INITIAL_POLL_DURATION_MS = 1000;
     static final int POLL_DURATION_MS = 500;
+    private static final Duration INITIAL_POLL_DURATION = Duration.ofMillis(INITIAL_POLL_DURATION_MS);
+    private static final Duration POLL_DURATION = Duration.ofMillis(POLL_DURATION_MS);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
+    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SnsSteps.class);
     private static final String CMD_TOPIC_TEST = "CT";
     private static final String SNAPSHOT_TOPIC_TEST = "ST";
@@ -230,8 +234,7 @@ public class SnsSteps implements EventListener {
     public static KafkaConsumer<?, ?> awakeConsumer(String topic) {
         KafkaConsumer<?, ?> kafkaConsumer = new KafkaConsumer<>(consumerConfig);
         kafkaConsumer.assign(Collections.singletonList(new TopicPartition(topic, 0)));
-        kafkaConsumer.assignment();
-        kafkaConsumer.poll(Duration.ofMillis(INITIAL_POLL_DURATION_MS));
+        kafkaConsumer.poll(INITIAL_POLL_DURATION);
         log.info("=====> Assigned to topic {}", topic);
         return kafkaConsumer;
     }
@@ -282,19 +285,7 @@ public class SnsSteps implements EventListener {
             consumerConfig.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class);
             consumerConfig.put(KafkaAvroDeserializerConfig.SPECIFIC_AVRO_READER_CONFIG, "true");
             consumerConfig.put("schema.registry.url", registryServer);
-            consumerConfig.put("max.poll.records", 1);
-
-            kafkaConsumerPartyCmd = new KafkaConsumer(consumerConfig);
-            kafkaConsumerObjectCmd = new KafkaConsumer(consumerConfig);
-            kafkaConsumerLocationCmd = new KafkaConsumer(consumerConfig);
-            kafkaConsumerEventCmd = new KafkaConsumer(consumerConfig);
-            kafkaConsumerServiceCmd = new KafkaConsumer(consumerConfig);
-            kafkaConsumerPartySnapshot = new KafkaConsumer(consumerConfig);
-            kafkaConsumerObjectSnapshot = new KafkaConsumer(consumerConfig);
-            kafkaConsumerLocationSnapshot = new KafkaConsumer(consumerConfig);
-            kafkaConsumerEventSnapshot = new KafkaConsumer(consumerConfig);
-            kafkaConsumerServiceSnapshot = new KafkaConsumer(consumerConfig);
-            kafkaConsumerRunlogCmd = new KafkaConsumer(consumerConfig);
+            consumerConfig.put("max.poll.records", 10);
 
             kafkaConsumerPartyCmd = (KafkaConsumer<PoleV2IdRecord, CmdPartyPoleRecord>) awakeConsumer(partyCmdTopic);
             kafkaConsumerObjectCmd =
@@ -363,31 +354,31 @@ public class SnsSteps implements EventListener {
         String readinessUrl = String.format("http://%s:%s/actuator/health/readiness", host, port);
         String profileReadinessUrl = String.format("http://%s:%s/cmd-adaptor-sns-%s/health/readiness", host, port, topicSuffix);
         log.info("Waiting for readiness at {} or {}", readinessUrl, profileReadinessUrl);
-        HttpClient client = HttpClient.newHttpClient();
+        String[] readinessUrls = {readinessUrl, profileReadinessUrl};
 
         int maxAttempts = 90; // up to ~90s
         int delayMs = 1000;
         String lastFailure = "No successful readiness response";
         for (int i = 1; i <= maxAttempts; i++) {
             try {
-                for (String url : new String[]{readinessUrl, profileReadinessUrl}) {
+                for (String url : readinessUrls) {
                     HttpRequest request = HttpRequest.newBuilder()
                             .uri(URI.create(url))
                             .header("Accept", "application/json")
-                            .timeout(Duration.ofSeconds(2))
+                            .timeout(REQUEST_TIMEOUT)
                             .GET()
                             .build();
-                    HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                    HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
                     if (response.statusCode() == 200 && response.body() != null && response.body().contains("\"status\":\"UP\"")) {
                         log.info("Readiness confirmed at {} on attempt {}", url, i);
                         return;
                     }
                     lastFailure = String.format("%s returned status=%s body=%s", url, response.statusCode(), response.body());
                 }
-                log.info("Readiness not yet UP on attempt {}/{}", i, maxAttempts);
+                log.debug("Readiness not yet UP on attempt {}/{}", i, maxAttempts);
             } catch (Exception e) {
                 lastFailure = e.toString();
-                log.info("Readiness check attempt {}/{} failed: {}", i, maxAttempts, e.toString());
+                log.debug("Readiness check attempt {}/{} failed: {}", i, maxAttempts, e.toString());
             }
             try { Thread.sleep(delayMs); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
         }
@@ -485,49 +476,58 @@ public class SnsSteps implements EventListener {
         Set<Object> records = new LinkedHashSet<>();
         int index = 0;
         while (records.size() < number && ++index < MAX_RETRIES_GET_CONSUMER_RECORDS) {
-            log.info("Retrieving records, attempt {}, record count {}", index, records.size());
+            log.debug("Retrieving records, attempt {}, record count {}", index, records.size());
             if (testType.equals(CMD_TOPIC_TEST)) {
                 ConsumerRecords<PoleV2IdRecord, SpecificRecordBase> messages =
-                        consumerCmd.poll(Duration.ofMillis(POLL_DURATION_MS));
-                messages.forEach(message -> {
+                        consumerCmd.poll(POLL_DURATION);
+                for (ConsumerRecord<PoleV2IdRecord, SpecificRecordBase> message : messages) {
                     if (haveTestIdHeader(message)) {
                         records.add(message.value().get(valueName));
+                        if (records.size() >= number) {
+                            break;
+                        }
                     }
-                });
+                }
             } else {
                 ConsumerRecords<PoleV2IdRecord, SpecificRecordBase> messages =
-                        consumerSnapshot.poll(Duration.ofMillis(POLL_DURATION_MS));
-                messages.forEach(message -> {
+                        consumerSnapshot.poll(POLL_DURATION);
+                for (ConsumerRecord<PoleV2IdRecord, SpecificRecordBase> message : messages) {
                     if (haveTestIdHeader(message)) {
                         if (valueName.equals(EVENT_RECORD)) {
                             records.add(message.value());
                         } else {
                             records.add(message.value().get("snapshot"));
                         }
+                        if (records.size() >= number) {
+                            break;
+                        }
                     }
-                });
+                }
             }
         }
         log.info("Records count: {}", records.size());
-            return records;
+        return records;
     }
 
     private Set<EntryRecord> pollForRunlogRecords(final int number) {
         Set<EntryRecord> runlogRecords = new LinkedHashSet<>();
         int index = 0;
         while (runlogRecords.size() < number && ++index < MAX_RETRIES_GET_CONSUMER_RECORDS) {
-            log.info("Retrieving runlog records, attempt {}, record count {}", index, runlogRecords.size());
+            log.debug("Retrieving runlog records, attempt {}, record count {}", index, runlogRecords.size());
             ConsumerRecords<IdentityRecord, EntryRecord> records =
-                    kafkaConsumerRunlogCmd.poll(Duration.ofSeconds(POLL_DURATION_MS));
-            records.forEach(rec -> {
-                log.info("Runlog record id = {}, has testId header = {}",
+                    kafkaConsumerRunlogCmd.poll(POLL_DURATION);
+            for (ConsumerRecord<IdentityRecord, EntryRecord> rec : records) {
+                log.debug("Runlog record id = {}, has testId header = {}",
                         rec.value().getMetadata().getIdentityRecord().getId(),
                         haveTestIdHeader(rec));
 
                 if (haveTestIdHeader(rec)) {
                     runlogRecords.add(rec.value());
+                    if (runlogRecords.size() >= number) {
+                        break;
+                    }
                 }
-            });
+            }
         }
         log.info("Runlog records count: {}", runlogRecords.size());
         return runlogRecords;

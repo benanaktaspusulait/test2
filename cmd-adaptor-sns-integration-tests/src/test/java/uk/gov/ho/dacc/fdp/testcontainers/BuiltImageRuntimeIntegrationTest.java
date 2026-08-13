@@ -27,6 +27,8 @@ class BuiltImageRuntimeIntegrationTest {
     private static final String IMAGE_UNDER_TEST =
             System.getProperty("sns.runtime.image", "docker-compose-command-adaptor:latest");
     private static final Duration READINESS_TIMEOUT = Duration.ofSeconds(120);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
+    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
     private static GenericContainer<?> commandAdaptor;
 
@@ -82,7 +84,6 @@ class BuiltImageRuntimeIntegrationTest {
     }
 
     private static void waitForReady(String readinessPath) {
-        HttpClient client = HttpClient.newHttpClient();
         long deadline = System.nanoTime() + READINESS_TIMEOUT.toNanos();
         String readinessUrl = "http://" + commandAdaptor.getHost() + ":" + commandAdaptor.getMappedPort(7112) + readinessPath;
         String lastFailure = "no successful readiness response";
@@ -92,10 +93,10 @@ class BuiltImageRuntimeIntegrationTest {
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(readinessUrl))
                         .header("Accept", "application/json")
-                        .timeout(Duration.ofSeconds(2))
+                        .timeout(REQUEST_TIMEOUT)
                         .GET()
                         .build();
-                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() == 200 && response.body() != null && response.body().contains("\"status\":\"UP\"")) {
                     LOG.info("Readiness confirmed at {}", readinessUrl);
                     return;
@@ -111,7 +112,7 @@ class BuiltImageRuntimeIntegrationTest {
             }
 
             try {
-                Thread.sleep(1000L);
+                Thread.sleep(500L);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 fail("Interrupted while waiting for readiness");
