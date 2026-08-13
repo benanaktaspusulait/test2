@@ -1,511 +1,406 @@
-Optimise the SNS "Build and Test with Testcontainers" CI step by overlapping
-Testcontainers Docker image pulls with Maven build/unit-test work.
+Optimise SNS CI test logging to reduce unnecessary console output during
+successful test execution without weakening failure diagnostics.
 
-This is a CONTROLLED IMPLEMENTATION + MEASUREMENT experiment.
+This is a FOCUSED IMPLEMENTATION + A/B MEASUREMENT task.
 
 Do NOT create:
 - markdown reports
 - benchmark files
 - TODO files
 - documentation
-- permanent timing artefacts
 - unrelated refactoring
+- permanent measurement artefacts
 
 The final branch must retain ONLY a measured winning implementation.
 
 ======================================================================
-CURRENT MEASURED STATE
+CURRENT STATE
 ======================================================================
 
 Current stable CI is approximately:
 
     Overall CI                             ~5:10
     Build and Test with Testcontainers    ~3:13
-    Build Command Adaptor Image           ~0:19
     Validate Built Image Runtime          ~0:31
-    Trivy                                 ~0:40
 
-The latest Build/Test log shows a significant part of the remaining time occurs
-before business scenarios execute.
-
-Observed image/startup costs include:
-
-- Schema Registry image is approximately 1 GB
-- Schema Registry image pull is approximately 22 seconds
-- aggregate images are approximately 460-475 MB each
-- several aggregate image pulls are approximately 9 seconds each
-- aggregates already start in parallel
-- Maven compile/unit/app-test work occurs before the real Testcontainers
-  integration suite reaches the container-dependent phase
-
-Goal:
-
-    overlap image transfer with Maven work that is already happening
-
-NOT:
-
-    add another serial image-pull stage
-
-======================================================================
-1. INSPECT CURRENT IMPLEMENTATION FIRST
-======================================================================
-
-Inspect the CURRENT repository.
-
-Relevant areas include:
-
-    .drone.star
-
-    cmd-adaptor-sns-integration-tests
-
-    SnsTestcontainersEnvironment
-
-    pom.xml files
-
-Determine the exact Docker images currently used for:
-
-- Redis
-- ZooKeeper
-- Kafka
-- Schema Registry
-- Party aggregate
-- Object aggregate
-- Location aggregate
-- Event aggregate
-- Service aggregate
-
-Do NOT guess image names or tags.
-
-Derive them from current source/configuration.
-
-Also inspect:
-
-- current Docker/DIND setup
-- DOCKER_HOST
-- whether the Maven command and Testcontainers use the same Docker daemon
-- whether docker CLI is available in the Maven CI container
-- whether image pulls are already cached in that daemon
-- whether Testcontainers uses image substitution/prefixing
-- whether private aggregate images require registry authentication
-- existing Artifactory/registry login flow
-
-Do not modify code until this is understood.
-
-======================================================================
-2. PRIMARY EXPERIMENT: BACKGROUND IMAGE PREFETCH
-======================================================================
-
-Implement a safe experiment in the existing:
-
-    Build and Test with Testcontainers
-
-step.
-
-The intended concept is:
-
-    start Docker image pulls asynchronously
-        |
-        +---- Maven clean verify starts immediately
-        |
-        +---- compile/unit tests run
-        |
-        +---- image downloads happen concurrently
-        |
-        +---- by the time Testcontainers needs the images,
-              most/all layers are already present
-
-Do NOT execute:
-
-    docker pull image1
-    docker pull image2
-    ...
-    mvn ...
-
-serially.
-
-That is explicitly NOT an optimisation.
-
-======================================================================
-3. USE THE SAME DOCKER DAEMON
-======================================================================
-
-The prefetch MUST target the exact same Docker daemon used by Testcontainers.
-
-Verify:
-
-    DOCKER_HOST
-
-and any required:
-
-    DOCKER_API_VERSION
-    TESTCONTAINERS_HOST_OVERRIDE
-
-The pre-pull must not download images into a different local daemon/container
-where Testcontainers cannot see them.
-
-Prove this from the current CI environment.
-
-======================================================================
-4. START ALL SAFE IMAGE PULLS CONCURRENTLY
-======================================================================
-
-Where compatible with the current environment, prefer one background prefetch
-group containing concurrent pulls.
-
-Conceptually:
-
-    (
-        docker pull <redis-image> &
-        docker pull <zookeeper-image> &
-        docker pull <kafka-image> &
-        docker pull <schema-registry-image> &
-        docker pull <party-image> &
-        docker pull <object-image> &
-        docker pull <location-image> &
-        docker pull <event-image> &
-        docker pull <service-image> &
-        wait
-    ) &
-
-    PREFETCH_PID=$!
-
-    mvn clean verify -Pci-testcontainers-snapshot
-
-Do NOT blindly paste this exact structure.
-
-First inspect:
-- shell used by Drone
-- registry authentication
-- image availability
-- whether simultaneous pulls overload the runner/network
-- current memory/CPU/network limitations
-
-Use the smallest robust implementation.
-
-======================================================================
-5. DO NOT BLOCK MAVEN ON PREFETCH AT THE START
-======================================================================
-
-The critical requirement is:
-
-    Maven must begin immediately after the prefetch is launched.
-
-Do NOT do:
-
-    start pulls
-    wait for all pulls
-    run Maven
-
-That removes the overlap and defeats the experiment.
-
-======================================================================
-6. HANDLE PREFETCH FAILURES CORRECTLY
-======================================================================
-
-Prefetch is a performance optimisation, NOT the source of truth for test
-correctness.
-
-Testcontainers must remain responsible for obtaining/validating required images
-when the integration suite starts.
-
-If an optional/background prefetch fails because of a transient pull problem,
-do not create a false-green situation.
-
-Preferred behaviour:
-
-- log the prefetch failure clearly
-- allow Testcontainers to perform its normal image pull
-- the actual Maven/Testcontainers suite must still fail normally if the image
-  really cannot be obtained
-
-Do NOT make a failed background optimisation silently corrupt the main command.
-
-Also do NOT hide Maven/Testcontainers failures.
-
-======================================================================
-7. AVOID DUPLICATE-PULL RACES
-======================================================================
-
-Investigate what happens if Testcontainers requests an image while the
-background docker pull for the same image is still running.
-
-Do not assume this is harmless.
-
-Check Docker daemon behaviour in the actual environment.
-
-If necessary, implement the minimum safe coordination.
-
-However:
-
-Do NOT add a fixed sleep.
-
-Do NOT wait for all prefetch work before Maven starts.
-
-Do NOT create a 20-30 second serial barrier immediately before integration
-tests unless measurement proves it improves total wall-clock.
-
-======================================================================
-8. DO NOT SPLIT MAVEN UNLESS NECESSARY
-======================================================================
-
-Keep the current main command initially:
-
-    mvn clean verify -Pci-testcontainers-snapshot
-
-Do NOT immediately split Maven into separate:
-
-    compile/unit
-    integration
-
-commands.
-
-A split Maven lifecycle can duplicate compilation, plugin execution or test
-work.
-
-Only evaluate a split as a SECOND experiment if background prefetch cannot
-safely overlap with the existing single Maven reactor.
-
-If a split is evaluated:
-
-- prove there is no duplicated reactor work
-- preserve all tests
-- measure the total CI wall-clock
-- revert if it does not improve the full step
-
-======================================================================
-9. PRESERVE EXISTING TESTCONTAINERS CONCURRENCY
-======================================================================
-
-Do NOT change the existing container dependency/startup model unless inspection
-proves it is broken.
-
-Preserve:
-
-- Redis/ZooKeeper independent startup behaviour
-- Kafka dependency on ZooKeeper
-- Schema Registry dependency on Kafka
-- parallel startup of the five aggregate containers
-- all five functional readiness checks
-- Schema Registry round-trip validation
-
-Do not replace functional readiness with container-running checks.
-
-======================================================================
-10. PRESERVE ALL EXISTING TEST RELIABILITY
-======================================================================
-
-Do not weaken or remove:
-
-- 14 business Cucumber scenarios
-- scenario-count guard
-- completed-scenario protection
-- strict testId correlation
-- Docker availability hard-fail
-- TestcontainersFailureDiagnostics
-- Kafka Streams clean shutdown fix
-- Schema Registry round-trip
-- aggregate readiness
-- unit tests
-- TopologyTestDriver tests
-- JaCoCo
-- built-image runtime validation
-- Trivy
-
-Do NOT add:
-
-    disabledWithoutDocker=true
-
-Do NOT allow a zero-test green build.
-
-======================================================================
-11. DO NOT REINTRODUCE REJECTED EXPERIMENTS
-======================================================================
-
-Do NOT reintroduce:
-
-    mvn -T 1C
-
-Keep:
-
-    mvn clean verify -Pci-testcontainers-snapshot
-
-unless a different command is independently proven necessary for this specific
-image-prefetch experiment.
-
-======================================================================
-12. DO NOT CHANGE IMAGE TAGS FOR SPEED
-======================================================================
-
-Use the exact images/tags currently required by the repository.
-
-Do NOT:
-
-- replace Schema Registry with another image
-- change Kafka distribution
-- downgrade images
-- use unofficial lightweight alternatives
-- change aggregate image versions
-- change production/runtime compatibility
-
-This experiment is about scheduling existing image transfer better.
-
-======================================================================
-13. OPTIONAL SECONDARY EXPERIMENT: PERSISTENT DIND IMAGE CACHE
-======================================================================
-
-Only AFTER background prefetch is tested, inspect whether the Drone/DIND setup
-already provides a safe mechanism to reuse pulled image layers between builds.
-
-Look for existing:
-
-- Docker data volume/cache
-- runner cache
-- registry mirror
-- persistent DIND storage
-- RepoSync-supported cache mechanism
-
-Do NOT invent a new platform-level Docker cache architecture inside this repo.
-
-If a supported existing mechanism is present and can be enabled locally with a
-small repo change, test it separately.
-
-Otherwise leave it alone and report that it requires platform-level work.
-
-Do not combine this experiment with background prefetch in the first
-measurement.
-
-======================================================================
-14. SECONDARY LOW-RISK LOGGING OPTIMISATION
-======================================================================
-
-Do NOT implement this together with the first image-prefetch measurement.
-
-After image-prefetch results are known, inspect CI test logging separately.
-
-The current logs repeatedly emit large blocks such as:
+The Build/Test logs contain large volumes of repeated INFO output including:
 
 - KafkaAvroSerializerConfig
 - KafkaAvroDeserializerConfig
-- Kafka client configuration
-- large SNS JSON payloads
-- large assertion values
+- Kafka client configuration dumps
+- Confluent serializer/deserializer configuration
+- framework startup/configuration messages
+- large JSON payloads from integration tests
+- large successful assertion values
 
-Determine whether CI-test profile logging can safely reduce noisy framework
-configuration logging to WARN/ERROR while preserving useful application/test
-diagnostics.
+The first experiment must NOT modify application/test business logging.
 
-Do NOT globally change production logging.
+Start only with noisy third-party/framework configuration logging.
 
-Do NOT hide errors.
+Goal:
 
-This must be a separate A/B experiment.
+    reduce successful-build console/log-forwarding overhead
+
+while preserving:
+
+    WARN
+    ERROR
+    stack traces
+    Maven failures
+    Surefire/Failsafe failures
+    Testcontainers diagnostics
+    application failure diagnostics
 
 ======================================================================
-15. MEASUREMENT
-======================================================================
+1. INSPECT CURRENT LOGGING CONFIGURATION
+   ======================================================================
 
-Before change reference:
+Inspect the CURRENT repository for:
+
+    application.yml
+    application.yaml
+    application.properties
+    logback.xml
+    logback-spring.xml
+    log4j configuration
+    test resources
+    CI-specific profiles
+    ci-testcontainers-snapshot profile
+    Spring Boot logging properties
+
+Search specifically for existing logger configuration.
+
+Determine:
+
+- which logging implementation is active
+- whether CI/test logging already has a dedicated profile
+- how Spring profiles are activated during:
+  mvn clean verify -Pci-testcontainers-snapshot
+- whether logger levels can be scoped ONLY to this CI test execution
+
+Do not modify production/default logging unless unavoidable.
+
+======================================================================
+2. IDENTIFY THE EXACT NOISY LOGGER NAMES
+   ======================================================================
+
+Use the current log output and source/dependency packages to identify the exact
+logger namespaces responsible for repeated config dumps.
+
+Likely candidates include packages/classes around:
+
+    io.confluent.kafka.serializers
+    KafkaAvroSerializerConfig
+    KafkaAvroDeserializerConfig
+    org.apache.kafka.common.config
+    org.apache.kafka.clients
+
+Do NOT blindly suppress broad:
+
+    org.apache.kafka
+
+unless inspection proves it is safe.
+
+Prefer the narrowest logger namespaces possible.
+
+======================================================================
+3. FIRST EXPERIMENT: FRAMEWORK CONFIG LOGGING ONLY
+   ======================================================================
+
+For the FIRST experiment, reduce only verbose third-party configuration logging.
+
+Target behaviour should be equivalent to:
+
+    successful configuration dumps:
+        INFO -> hidden
+
+    WARN:
+        still visible
+
+    ERROR:
+        still visible
+
+Use WARN as the preferred logger threshold where appropriate.
+
+Example concept only:
+
+    logging.level.io.confluent.kafka.serializers=WARN
+    logging.level.org.apache.kafka.common.config=WARN
+
+Do NOT blindly paste these exact properties without confirming the actual
+logger names producing the current output.
+
+======================================================================
+4. SCOPE TO CI TEST EXECUTION
+   ======================================================================
+
+The logging reduction must affect ONLY:
+
+    CI/Testcontainers test execution
+
+or another clearly test-only profile.
+
+Do NOT reduce production logging.
+
+Do NOT modify runtime container production logging.
+
+Do NOT globally change the application's normal logging policy.
+
+Preferred approaches:
+
+- CI/test-specific Spring profile
+- Maven profile-scoped system properties
+- test resource logging configuration
+
+Use the smallest existing configuration mechanism.
+
+======================================================================
+5. PRESERVE FAILURE INFORMATION
+   ======================================================================
+
+After the change, the following MUST still be visible:
+
+- ERROR logs
+- WARN logs
+- exception stack traces
+- test assertion failures
+- Maven BUILD FAILURE
+- Surefire/Failsafe test failure summaries
+- Testcontainers startup failures
+- Docker unavailable failures
+- Kafka connectivity failures
+- Schema Registry failures
+- aggregate readiness failures
+- Kafka Streams shutdown failures
+- TestcontainersFailureDiagnostics output
+
+Do NOT suppress stderr.
+
+Do NOT redirect logs to /dev/null.
+
+Do NOT disable Maven error output.
+
+Do NOT add shell filtering such as:
+
+    grep
+    sed
+    awk
+    tail
+
+to hide output after it is produced.
+
+Reduce logging at the logger configuration/source level.
+
+======================================================================
+6. DO NOT MODIFY BUSINESS TEST LOGGING YET
+   ======================================================================
+
+For the FIRST experiment, do NOT change:
+
+    IntegrationTestSteps
+    assertions
+    testId logs
+    scenario logs
+    business payload logs
+    application custom INFO logs
+
+Even if they are verbose.
+
+This is deliberate so the A/B experiment has one variable:
+
+    third-party/framework config logging only
+
+If this first experiment produces no meaningful gain, it may be reverted before
+considering application/test payload logging separately.
+
+======================================================================
+7. DO NOT CHANGE TEST BEHAVIOUR
+   ======================================================================
+
+Preserve all existing:
+
+- 14 Cucumber business scenarios
+- scenario-count guard
+- completed-scenario protection
+- strict testId correlation
+- Docker hard-fail
+- Testcontainers infrastructure
+- Schema Registry round-trip
+- aggregate readiness
+- Kafka polling behaviour
+- Kafka Streams lifecycle/shutdown
+- TopologyTestDriver tests
+- unit tests
+- JaCoCo
+- BuiltImageRuntimeIntegrationTest
+- Trivy
+
+Logging optimisation must not change test timing through altered waits,
+timeouts or assertions.
+
+======================================================================
+8. VERIFY FAILURE DIAGNOSTICS LOCALLY
+   ======================================================================
+
+Where practical, validate not only a green run but one controlled failing case.
+
+Do NOT commit a failing test.
+
+Temporarily cause a safe local failure if possible, for example:
+
+- invalid expected assertion
+- temporary invalid readiness target
+- another reversible test-only failure
+
+Verify the console still shows:
+
+    failure reason
+    relevant ERROR/WARN
+    stack trace
+    Maven test failure summary
+
+Then revert the temporary failure completely.
+
+Do not leave failure-injection code in the diff.
+
+======================================================================
+9. MEASURE GREEN RUN
+   ======================================================================
+
+Run:
+
+    mvn clean verify -Pci-testcontainers-snapshot
+
+Confirm:
+
+    BUILD SUCCESS
+    14 scenarios executed
+    failures = 0
+    errors = 0
+    no unexpected skips
+
+Capture only in terminal/chat:
+
+    Maven total time
+    IntegrationTest time
+    integration module time
+
+Do not create files.
+
+======================================================================
+10. RUN FULL CI TWICE
+    ======================================================================
+
+After the logger-level change, run the full Drone pipeline twice if available.
+
+Current reference:
 
     Build and Test with Testcontainers ~= 3:13
     Overall CI ~= 5:10
 
-After implementing ONLY background prefetch:
+Record:
 
-run the full CI pipeline twice if possible.
+    Build/Test run 1
+    Build/Test run 2
+    Overall run 1
+    Overall run 2
 
-Record from terminal/CI output only:
-
-    Build and Test with Testcontainers
-    Overall CI
-    Maven total
-    Testcontainers integration module time
-    IntegrationTest time
-
-Also inspect logs for actual image pulls.
-
-We want evidence that lines previously showing long image download times are
-replaced by or reduced to behaviour equivalent to:
-
-    image already present
-    local image found
-    minimal/no pull time
-
-Do NOT create benchmark files.
+Also visually confirm the repeated Confluent/Kafka config dumps are gone or
+substantially reduced.
 
 ======================================================================
-16. SUCCESS CRITERIA
-======================================================================
+11. KEEP/REVERT RULE
+    ======================================================================
 
-Keep the implementation ONLY if:
+Keep the change ONLY if:
 
-1. Full pipeline remains green.
+- both CI runs remain green
+- all expected tests still execute
+- failure diagnostics remain useful
+- production logging is untouched
+- console output is materially reduced
+- wall-clock improvement is reproducible
 
-2. All 14 business scenarios still run.
+Prefer a meaningful reproducible improvement.
 
-3. Failures = 0.
-   Errors = 0.
-   No unexpected skips.
+Do NOT keep extra logging complexity for a 1-2 second random fluctuation.
 
-4. No false-green behaviour is introduced.
-
-5. Testcontainers still validates the same infrastructure.
-
-6. Build/Test wall-clock shows a reproducible improvement across repeated CI
-   runs.
-
-7. The improvement is caused by overlapped/cached image transfer rather than
-   skipped tests or weakened readiness.
-
-If improvement is negligible or CI becomes less stable:
+If there is no clear benefit:
 
     REVERT the experiment completely.
 
-Do not retain complexity without measured benefit.
+======================================================================
+12. OPTIONAL SECOND EXPERIMENT
+    ======================================================================
+
+ONLY if the framework logger experiment is safe but still leaves substantial
+console output, inspect application/test successful-path payload logging.
+
+Possible candidates may include:
+
+    IntegrationTestSteps
+    successful full JSON input payloads
+    successful full output record values
+    verbose successful assertion payloads
+
+Do NOT implement this in the same initial A/B measurement.
+
+If evaluated later:
+
+- retain testId/scenario identification at INFO
+- move only large successful payload dumps to DEBUG
+- preserve failure-time payload/context
+- preserve assertion failure diagnostics
+
+Measure separately.
 
 ======================================================================
-17. FINAL DIFF HYGIENE
-======================================================================
+13. FINAL DIFF HYGIENE
+    ======================================================================
 
 Run:
 
     git diff
     git status
 
-Expected likely file:
+Expected change should be very small.
 
-    .drone.star
+Likely files:
 
-Only modify Java/Testcontainers source if absolutely required for safe
-coordination.
+    test/CI logging configuration
+    Maven profile configuration
+
+Avoid Java source changes for the first experiment.
 
 Do NOT leave:
 
-- temporary timing code
-- debugging scripts
-- experimental shell files
-- reports
-- unrelated cleanup
+- temporary failures
+- temporary diagnostics
+- measurement code
+- benchmark files
+- shell log filters
+- unrelated changes
 
 ======================================================================
 FINAL RESPONSE
 ======================================================================
 
-Do not create a report.
+Reply only in terminal/chat.
 
-Reply only in terminal/chat, maximum 15 lines:
+Maximum 15 lines:
 
-- exact images prefetched
-- same Docker daemon confirmed: YES/NO
-- prefetch concurrent with Maven: YES/NO
-- serial pre-pull introduced: YES/NO
+- logging backend/config mechanism
+- exact logger namespaces changed
+- old levels
+- new levels
+- production logging changed: YES/NO
+- WARN preserved: YES/NO
+- ERROR preserved: YES/NO
+- stack traces preserved: YES/NO
+- 14 scenarios executed: YES/NO
+- failures/errors/skips
 - Build/Test before
 - Build/Test run 1 after
 - Build/Test run 2 after
-- Overall CI before
-- Overall CI after
-- 14 scenarios executed: YES/NO
-- failures/errors/skips
-- image pull timing before/after
 - files changed
-- experiment kept/reverted
-- blocker: none / exact blocker
+- experiment kept/reverted + reason
