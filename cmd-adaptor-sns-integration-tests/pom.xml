@@ -15,6 +15,7 @@
     <properties>
         <testcontainers.version>1.20.4</testcontainers.version>
         <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
+        <surefire.additional.excludes>none</surefire.additional.excludes>
         <sns.testcontainers.enabled>false</sns.testcontainers.enabled>
         <sns.testcontainers.skip-if-docker-unavailable>true</sns.testcontainers.skip-if-docker-unavailable>
         <sns.testcontainers.aggregators.enabled>false</sns.testcontainers.aggregators.enabled>
@@ -190,6 +191,7 @@
                 <sns.testcontainers.skip-if-docker-unavailable>false</sns.testcontainers.skip-if-docker-unavailable>
                 <sns.testcontainers.aggregators.enabled>false</sns.testcontainers.aggregators.enabled>
                 <sns.testcontainers.expected-scenarios>0</sns.testcontainers.expected-scenarios>
+                <surefire.additional.excludes>**/TestcontainersSuiteCoverageTest</surefire.additional.excludes>
                 <failsafe.includes>**/BuiltImageRuntimeIntegrationTest</failsafe.includes>
                 <failsafe.excludes>none</failsafe.excludes>
             </properties>
@@ -333,6 +335,7 @@
                     <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                     <excludes>
                         <exclude>**/*IntegrationTest</exclude>
+                        <exclude>${surefire.additional.excludes}</exclude>
                     </excludes>
                     <skip>${skip.integration.tests}</skip>
                 </configuration>

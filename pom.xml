@@ -27,6 +27,7 @@
         <spring-boot-maven-plugin.version>3.5.9</spring-boot-maven-plugin.version> <!-- must match spring version in fdp-bom -->
         <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
         <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
+        <maven-install-plugin.version>3.1.4</maven-install-plugin.version>
         <fdp-cmd-adaptor-test-common.version>2.4.0</fdp-cmd-adaptor-test-common.version>
         <fdp-commons.version>5.2.9</fdp-commons.version>
         <fdp-bom.version>3.2.11</fdp-bom.version>
@@ -155,6 +156,27 @@
         </dependency>
     </dependencies>
 
+
+    <profiles>
+        <profile>
+            <id>ci-local-install-artifacts</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-install-plugin</artifactId>
+                        <version>${maven-install-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>install-reactor-artifacts-at-verify</id>
+                                <phase>verify</phase>
+                                <goals><goal>install</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <repositories>
         <repository>
