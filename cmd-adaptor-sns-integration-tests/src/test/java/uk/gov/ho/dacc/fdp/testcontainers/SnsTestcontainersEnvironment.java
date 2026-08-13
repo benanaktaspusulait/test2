@@ -2,9 +2,11 @@ package uk.gov.ho.dacc.fdp.testcontainers;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.streams.KafkaStreams;
 import org.junit.Assume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.DockerClientFactory;
@@ -15,6 +17,7 @@ import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.DockerImageName;
 import uk.gov.ho.dacc.fdp.CmdAdaptorApplication;
+import uk.gov.ho.dacc.fdp.fdp_commons.config.KafkaStreamConfig;
 
 import java.net.URI;
 import java.net.InetAddress;
@@ -61,9 +64,9 @@ public final class SnsTestcontainersEnvironment {
     private static final String TOPIC_SUFFIX = "tc" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     private static final String RUN_ID = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(2);
-    private static final Duration APP_CLIENT_SHUTDOWN_TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration KAFKA_STREAMS_CLOSE_TIMEOUT = Duration.ofSeconds(30);
+    private static final long KAFKA_STREAMS_SHUTDOWN_POLL_MS = 100L;
     private static final long READINESS_POLL_INTERVAL_MS = 500L;
-    private static final long APP_CLIENT_SHUTDOWN_POLL_MS = 100L;
     private static final int AGGREGATE_READINESS_MAX_ATTEMPTS = 240;
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
@@ -268,10 +271,11 @@ public final class SnsTestcontainersEnvironment {
 
     public static synchronized void stopAll() {
         if (applicationContext != null) {
-            applicationContext.close();
+            ConfigurableApplicationContext context = applicationContext;
+            stopKafkaStreams(context);
+            context.close();
             applicationContext = null;
             applicationStarted = false;
-            awaitApplicationKafkaClientsToStop();
         }
 
         stopContainer(AGGREGATE_SERVICE);
@@ -299,39 +303,77 @@ public final class SnsTestcontainersEnvironment {
         }
     }
 
-    private static void awaitApplicationKafkaClientsToStop() {
-        final long deadlineNanos = System.nanoTime() + APP_CLIENT_SHUTDOWN_TIMEOUT.toNanos();
-        List<String> activeKafkaThreads = getActiveApplicationKafkaThreads();
-        while (!activeKafkaThreads.isEmpty() && System.nanoTime() < deadlineNanos) {
-            sleepUninterruptibly(APP_CLIENT_SHUTDOWN_POLL_MS);
-            activeKafkaThreads = getActiveApplicationKafkaThreads();
+    private static void stopKafkaStreams(ConfigurableApplicationContext context) {
+        List<KafkaStreams> kafkaStreams = getManagedKafkaStreams(context);
+        if (kafkaStreams.isEmpty()) {
+            return;
         }
-        if (!activeKafkaThreads.isEmpty()) {
-            LOG.warn("Continuing infrastructure shutdown with still-active application Kafka threads: {}",
-                    activeKafkaThreads);
+
+        for (KafkaStreams stream : kafkaStreams) {
+            if (stream == null) {
+                continue;
+            }
+            try {
+                stream.close(KAFKA_STREAMS_CLOSE_TIMEOUT);
+            } catch (RuntimeException e) {
+                LOG.warn("Kafka Streams close failed for state {}", safeState(stream), e);
+            }
+        }
+
+        waitForKafkaStreamsToStop(kafkaStreams);
+    }
+
+    private static List<KafkaStreams> getManagedKafkaStreams(ConfigurableApplicationContext context) {
+        try {
+            KafkaStreamConfig kafkaStreamConfig = context.getBean(KafkaStreamConfig.class);
+            List<KafkaStreams> streams = kafkaStreamConfig.getKafkaStreams();
+            if (streams == null || streams.isEmpty()) {
+                return List.of();
+            }
+            return new ArrayList<>(streams);
+        } catch (NoSuchBeanDefinitionException noBean) {
+            return List.of();
         }
     }
 
-    private static List<String> getActiveApplicationKafkaThreads() {
-        final String threadPrefix = "fdp-cmd-adaptor-sns-" + TOPIC_SUFFIX;
+    private static void waitForKafkaStreamsToStop(List<KafkaStreams> kafkaStreams) {
+        long deadlineNanos = System.nanoTime() + KAFKA_STREAMS_CLOSE_TIMEOUT.toNanos();
+        List<String> activeStates = activeKafkaStreamsStates(kafkaStreams);
+
+        while (!activeStates.isEmpty() && System.nanoTime() < deadlineNanos) {
+            sleepUninterruptibly(KAFKA_STREAMS_SHUTDOWN_POLL_MS);
+            activeStates = activeKafkaStreamsStates(kafkaStreams);
+        }
+
+        if (!activeStates.isEmpty()) {
+            LOG.warn("Continuing application context shutdown with active Kafka Streams states: {}", activeStates);
+        }
+    }
+
+    private static List<String> activeKafkaStreamsStates(List<KafkaStreams> kafkaStreams) {
         List<String> active = new ArrayList<>();
-        for (Thread thread : Thread.getAllStackTraces().keySet()) {
-            if (thread == null || !thread.isAlive() || thread.isDaemon()) {
+        for (KafkaStreams stream : kafkaStreams) {
+            if (stream == null) {
                 continue;
             }
-            final String name = thread.getName();
-            if (name == null || !name.contains(threadPrefix)) {
-                continue;
-            }
-            if (name.contains("StreamThread")
-                    || name.contains("GlobalStreamThread")
-                    || name.contains("kafka-producer-network-thread")
-                    || name.contains("kafka-admin-client-thread")
-                    || name.contains("kafka-coordinator-heartbeat-thread")) {
-                active.add(name);
+            KafkaStreams.State state = safeState(stream);
+            if (!isTerminalKafkaStreamsState(state)) {
+                active.add(state.name());
             }
         }
         return active;
+    }
+
+    private static KafkaStreams.State safeState(KafkaStreams stream) {
+        try {
+            return stream.state();
+        } catch (RuntimeException e) {
+            return KafkaStreams.State.ERROR;
+        }
+    }
+
+    private static boolean isTerminalKafkaStreamsState(KafkaStreams.State state) {
+        return state == KafkaStreams.State.NOT_RUNNING || state == KafkaStreams.State.ERROR;
     }
 
     private static void sleepUninterruptibly(long sleepMs) {
