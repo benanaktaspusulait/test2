@@ -104,6 +104,7 @@ public class SnsSteps implements EventListener {
     private static final Duration INITIAL_POLL_DURATION = Duration.ofMillis(INITIAL_POLL_DURATION_MS);
     private static final Duration POLL_DURATION = Duration.ofMillis(POLL_DURATION_MS);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration KAFKA_CLIENT_CLOSE_TIMEOUT = Duration.ofSeconds(5);
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SnsSteps.class);
     private static final String CMD_TOPIC_TEST = "CT";
@@ -315,7 +316,7 @@ public class SnsSteps implements EventListener {
                 SnsTestcontainersEnvironment.dumpContainerLogs("Cucumber test run failed");
             }
             if (kafkaProducer != null) {
-                kafkaProducer.close();
+                kafkaProducer.close(KAFKA_CLIENT_CLOSE_TIMEOUT);
             }
             closeQuietly(kafkaConsumerPartyCmd);
             closeQuietly(kafkaConsumerObjectCmd);
@@ -341,7 +342,7 @@ public class SnsSteps implements EventListener {
 
     private static void closeQuietly(KafkaConsumer<?, ?> consumer) {
         if (consumer != null) {
-            consumer.close();
+            consumer.close(KAFKA_CLIENT_CLOSE_TIMEOUT);
         }
     }
 

@@ -61,7 +61,9 @@ public final class SnsTestcontainersEnvironment {
     private static final String TOPIC_SUFFIX = "tc" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     private static final String RUN_ID = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration APP_CLIENT_SHUTDOWN_TIMEOUT = Duration.ofSeconds(30);
     private static final long READINESS_POLL_INTERVAL_MS = 500L;
+    private static final long APP_CLIENT_SHUTDOWN_POLL_MS = 100L;
     private static final int AGGREGATE_READINESS_MAX_ATTEMPTS = 240;
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
@@ -269,6 +271,7 @@ public final class SnsTestcontainersEnvironment {
             applicationContext.close();
             applicationContext = null;
             applicationStarted = false;
+            awaitApplicationKafkaClientsToStop();
         }
 
         stopContainer(AGGREGATE_SERVICE);
@@ -293,6 +296,49 @@ public final class SnsTestcontainersEnvironment {
         redisStarted = false;
         if (applicationContext == null) {
             applicationStarted = false;
+        }
+    }
+
+    private static void awaitApplicationKafkaClientsToStop() {
+        final long deadlineNanos = System.nanoTime() + APP_CLIENT_SHUTDOWN_TIMEOUT.toNanos();
+        List<String> activeKafkaThreads = getActiveApplicationKafkaThreads();
+        while (!activeKafkaThreads.isEmpty() && System.nanoTime() < deadlineNanos) {
+            sleepUninterruptibly(APP_CLIENT_SHUTDOWN_POLL_MS);
+            activeKafkaThreads = getActiveApplicationKafkaThreads();
+        }
+        if (!activeKafkaThreads.isEmpty()) {
+            LOG.warn("Continuing infrastructure shutdown with still-active application Kafka threads: {}",
+                    activeKafkaThreads);
+        }
+    }
+
+    private static List<String> getActiveApplicationKafkaThreads() {
+        final String threadPrefix = "fdp-cmd-adaptor-sns-" + TOPIC_SUFFIX;
+        List<String> active = new ArrayList<>();
+        for (Thread thread : Thread.getAllStackTraces().keySet()) {
+            if (thread == null || !thread.isAlive() || thread.isDaemon()) {
+                continue;
+            }
+            final String name = thread.getName();
+            if (name == null || !name.contains(threadPrefix)) {
+                continue;
+            }
+            if (name.contains("StreamThread")
+                    || name.contains("GlobalStreamThread")
+                    || name.contains("kafka-producer-network-thread")
+                    || name.contains("kafka-admin-client-thread")
+                    || name.contains("kafka-coordinator-heartbeat-thread")) {
+                active.add(name);
+            }
+        }
+        return active;
+    }
+
+    private static void sleepUninterruptibly(long sleepMs) {
+        try {
+            Thread.sleep(sleepMs);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
         }
     }
 
