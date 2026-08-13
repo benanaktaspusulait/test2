@@ -1,7 +1,7 @@
 From a10d6a5c82cda6af124c4d7504071c17d6b493f9 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Wed, 8 Jul 2026 09:43:25 +0100
-Subject: [PATCH 01/56] CST-2177 create .dockerignore file
+Subject: [PATCH 01/58] CST-2177 create .dockerignore file
 
 ---
  cmd-adaptor-sns/.dockerignore | 34 ++++++++++++++++++++++++++++++++++
@@ -49,14 +49,14 @@ index 00000000..3c1aef56
 +temp/
 +.tmp/
 \ No newline at end of file
--- 
+--
 GitLab
 
 
 From 3f7d9674ad2c7bf0595689be3f5136b143c87df6 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 9 Jul 2026 14:22:58 +0100
-Subject: [PATCH 02/56] =?UTF-8?q?CST-2189=20measuring=20T3.3=20=E2=80=94?=
+Subject: [PATCH 02/58] =?UTF-8?q?CST-2189=20measuring=20T3.3=20=E2=80=94?=
  =?UTF-8?q?=20Apply=20one=20safe=20Docker=20build=20optimisation?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -406,14 +406,14 @@ index 00000000..d6b603f9
 +log "Summary: $SUMMARY"
 +cat "$SUMMARY"
 \ No newline at end of file
--- 
+--
 GitLab
 
 
 From 94822a6cb659b1853d0dbb70eb97b680813532c6 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Wed, 22 Jul 2026 09:41:42 +0100
-Subject: [PATCH 03/56] =?UTF-8?q?CST-2263=20T4.2=20=E2=80=94=20Implement?=
+Subject: [PATCH 03/58] =?UTF-8?q?CST-2263=20T4.2=20=E2=80=94=20Implement?=
  =?UTF-8?q?=20Redis=20Testcontainers=20smoke/wiring=20pilot?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -430,9 +430,9 @@ index cf75a7b3..44f2783c 100644
 --- a/cmd-adaptor-sns-integration-tests/pom.xml
 +++ b/cmd-adaptor-sns-integration-tests/pom.xml
 @@ -12,6 +12,11 @@
- 
+
      <artifactId>cmd-adaptor-sns-integration-testing</artifactId>
- 
+
 +    <properties>
 +        <testcontainers.version>1.19.8</testcontainers.version>
 +        <jedis.version>4.4.3</jedis.version>
@@ -460,7 +460,7 @@ index cf75a7b3..44f2783c 100644
 @@ -188,6 +202,26 @@
              <scope>test</scope>
          </dependency>
- 
+
 +        <!-- T4.2: Testcontainers Redis smoke/wiring pilot -->
 +        <dependency>
 +            <groupId>org.testcontainers</groupId>
@@ -482,7 +482,7 @@ index cf75a7b3..44f2783c 100644
 +        </dependency>
 +
      </dependencies>
- 
+
      <build>
 @@ -408,4 +442,4 @@
              <url>https://packages.confluent.io/maven/</url>
@@ -576,14 +576,14 @@ index 00000000..80a34e5c
 +    }
 +}
 \ No newline at end of file
--- 
+--
 GitLab
 
 
 From b265940b8e4728239be3bd7374ae4e8c54d370b8 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 3 Aug 2026 11:27:18 +0100
-Subject: [PATCH 04/56] =?UTF-8?q?CST-2263=20T4.2=20=E2=80=94=20Implement?=
+Subject: [PATCH 04/58] =?UTF-8?q?CST-2263=20T4.2=20=E2=80=94=20Implement?=
  =?UTF-8?q?=20Redis=20Testcontainers=20smoke/wiring=20pilot?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -648,14 +648,14 @@ index 00000000..a73a5760
 +  exit 1
 +fi
 \ No newline at end of file
--- 
+--
 GitLab
 
 
 From b77989bd031e8b482e189ca0d061d2c827d0f2fa Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 09:18:59 +0100
-Subject: [PATCH 05/56] CST-2320 Polish Redis smoke test docs and Dockerfile
+Subject: [PATCH 05/58] CST-2320 Polish Redis smoke test docs and Dockerfile
  layering
 
 - Clarify MinimalRedisTest as an opt-in local Testcontainers smoke check
@@ -675,7 +675,7 @@ index 80a34e5c..591fbee9 100644
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/MinimalRedisTest.java
 @@ -15,14 +15,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  import static org.junit.jupiter.api.Assertions.assertTrue;
- 
+
  /**
 - * T4.2 — Redis Testcontainers smoke/wiring pilot.
 + * E2-S1.2 — Redis Testcontainers local smoke check.
@@ -697,7 +697,7 @@ index 80a34e5c..591fbee9 100644
   *   test
 @@ -39,6 +43,7 @@ class MinimalRedisTest {
      private Jedis client;
- 
+
      private Jedis createClient() {
 +        // Endpoint is resolved dynamically at runtime — no hardcoded host or port.
          Jedis jedis = new Jedis(redis.getHost(), redis.getFirstMappedPort());
@@ -706,19 +706,19 @@ index 80a34e5c..591fbee9 100644
 @@ -62,8 +67,9 @@ class MinimalRedisTest {
      void setAndGetUniqueKey() {
          client = createClient();
- 
+
 -        String key = "t42-pilot-" + UUID.randomUUID();
 -        String value = "test-value-" + UUID.randomUUID();
 +        // UUID suffix ensures test data is isolated across repeated runs.
 +        String key   = "minimal-redis-" + UUID.randomUUID();
 +        String value = "test-value-"     + UUID.randomUUID();
- 
+
          client.set(key, value);
          String retrieved = client.get(key);
 @@ -71,6 +77,8 @@ class MinimalRedisTest {
          assertNotNull(retrieved, "GET should return a value after SET");
          assertEquals(value, retrieved, "GET should return the exact value that was SET");
- 
+
 +        // Explicit cleanup — container is also destroyed after the test class,
 +        // but del() keeps the state clean if the container is reused in future.
          client.del(key);
@@ -731,12 +731,12 @@ index 5c59e70d..a824691a 100644
 @@ -8,9 +8,6 @@
  #############################################################################
  FROM amazoncorretto:17
- 
+
 -COPY ./target/cmd-adaptor-sns-exec.jar /local
 -COPY ./target/dependencies/opentelemetry-javaagent.jar /local/opentelemetry-javaagent.jar
 -
  WORKDIR /tmp
- 
+
  RUN yum install -y \
 @@ -20,10 +17,9 @@ RUN yum install -y \
      && yum erase -y vim-data \
@@ -770,18 +770,18 @@ index 5c59e70d..a824691a 100644
 @@ -42,4 +42,4 @@ RUN yum install -y \
  WORKDIR /home/fdpuser
  USER fdpuser
- 
+
 -CMD ["java", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8077", "-javaagent:/local/opentelemetry-javaagent.jar", "-Dcom.sun.management.jmxremote", "-Dcom.sun.management.jmxremote.port=9012", "-Dcom.sun.management.jmxremote.rmi.port=9012", "-Dcom.sun.management.jmxremote.authenticate=false", "-Dcom.sun.management.jmxremote.local.only=false", "-Dcom.sun.management.jmxremote.ssl=false", "-Djava.rmi.server.hostname=localhost", "-jar", "/local/cmd-adaptor-sns-exec.jar"]
 +CMD ["java", "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8077", "-javaagent:/local/opentelemetry-javaagent.jar", "-Dcom.sun.management.jmxremote", "-Dcom.sun.management.jmxremote.port=9012", "-Dcom.sun.management.jmxremote.rmi.port=9012", "-Dcom.sun.management.jmxremote.authenticate=false", "-Dcom.sun.management.jmxremote.local.only=false", "-Dcom.sun.management.jmxremote.ssl=false", "-Djava.rmi.server.hostname=localhost", "-jar", "/local/cmd-adaptor-sns-exec.jar"]
 \ No newline at end of file
--- 
+--
 GitLab
 
 
 From ffa3e2dc45b2e444499104d3426b9bb143d01388 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 09:34:36 +0100
-Subject: [PATCH 06/56] CST-2320 fix
+Subject: [PATCH 06/58] CST-2320 fix
 
 ---
  .../fdp/testcontainers/MinimalRedisTest.java  | 74 ++++++++-----------
@@ -794,10 +794,10 @@ index 591fbee9..119e092d 100644
 @@ -8,50 +8,33 @@ import org.testcontainers.junit.jupiter.Container;
  import org.testcontainers.junit.jupiter.Testcontainers;
  import redis.clients.jedis.Jedis;
- 
+
 +import java.time.Duration;
  import java.util.UUID;
- 
+
 -import static org.junit.jupiter.api.Assertions.assertEquals;
 -import static org.junit.jupiter.api.Assertions.assertNotNull;
 -import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -824,7 +824,7 @@ index 591fbee9..119e092d 100644
 +
  @Testcontainers
  class MinimalRedisTest {
- 
+
      @Container
 -    private final GenericContainer<?> redis = new GenericContainer<>("redis:5.0.6")
 -            .withExposedPorts(6379)
@@ -834,9 +834,9 @@ index 591fbee9..119e092d 100644
 +                    .withExposedPorts(6379)
 +                    .waitingFor(Wait.forListeningPort())
 +                    .withStartupTimeout(Duration.ofSeconds(30));
- 
+
      private Jedis client;
- 
+
      private Jedis createClient() {
 -        // Endpoint is resolved dynamically at runtime — no hardcoded host or port.
 -        Jedis jedis = new Jedis(redis.getHost(), redis.getFirstMappedPort());
@@ -847,7 +847,7 @@ index 591fbee9..119e092d 100644
 +                REDIS.getMappedPort(6379)
 +        );
      }
- 
+
      @AfterEach
      void tearDown() {
 -        if (client != null && client.isConnected()) {
@@ -868,11 +868,11 @@ index 591fbee9..119e092d 100644
 +                "Redis PING should return PONG"
 +        );
      }
- 
+
      @Test
      void setAndGetUniqueKey() {
          client = createClient();
- 
+
 -        // UUID suffix ensures test data is isolated across repeated runs.
 -        String key   = "minimal-redis-" + UUID.randomUUID();
 -        String value = "test-value-"     + UUID.randomUUID();
@@ -882,17 +882,17 @@ index 591fbee9..119e092d 100644
 +        String setResult = client.set(key, value);
 +
 +        assertEquals("OK", setResult);
- 
+
 -        client.set(key, value);
          String retrieved = client.get(key);
- 
+
 -        assertNotNull(retrieved, "GET should return a value after SET");
 -        assertEquals(value, retrieved, "GET should return the exact value that was SET");
 +        assertNotNull(retrieved);
 +        assertEquals(value, retrieved);
 +
 +        Long deleted = client.del(key);
- 
+
 -        // Explicit cleanup — container is also destroyed after the test class,
 -        // but del() keeps the state clean if the container is reused in future.
 -        client.del(key);
@@ -903,14 +903,14 @@ index 591fbee9..119e092d 100644
      }
  }
 \ No newline at end of file
--- 
+--
 GitLab
 
 
 From 570727443352149fff5ff24bf2c2f498481b3d9b Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 10:15:01 +0100
-Subject: [PATCH 07/56] CST-2320 fix
+Subject: [PATCH 07/58] CST-2320 fix
 
 ---
  .drone.star                                   | 19 +++++++++++++++++++
@@ -958,7 +958,7 @@ index 44f2783c..897aca84 100644
          <jedis.version>4.4.3</jedis.version>
 +        <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
      </properties>
- 
+
      <profiles>
 @@ -121,6 +122,7 @@
                  <skip.containers>true</skip.containers>
@@ -990,30 +990,30 @@ index 119e092d..04a01032 100644
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/MinimalRedisTest.java
 @@ -1,6 +1,7 @@
  package uk.gov.ho.dacc.fdp.testcontainers;
- 
+
  import org.junit.jupiter.api.AfterEach;
 +import org.junit.jupiter.api.Tag;
  import org.junit.jupiter.api.Test;
  import org.testcontainers.containers.GenericContainer;
  import org.testcontainers.containers.wait.strategy.Wait;
 @@ -13,7 +14,8 @@ import java.util.UUID;
- 
+
  import static org.junit.jupiter.api.Assertions.*;
- 
+
 -@Testcontainers
 +@Tag("testcontainers")
 +@Testcontainers(disabledWithoutDocker = true)
  class MinimalRedisTest {
- 
+
      @Container
--- 
+--
 GitLab
 
 
 From c923c690323a85e181197da07fad77e9eaee816f Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:09:05 +0100
-Subject: [PATCH 08/56] CST-2320 fix
+Subject: [PATCH 08/58] CST-2320 fix
 
 ---
  .drone.star                                          | 12 ++++++++++--
@@ -1051,38 +1051,38 @@ index 2ebaa0f4..44829c64 100644
 +++ b/cmd-adaptor-sns-integration-tests/src/test/resources/docker-compose/docker-compose.yml
 @@ -233,6 +233,7 @@ services:
      restart: always
- 
+
    command-adaptor:
 +    image: "${COMMAND_ADAPTOR_IMAGE-docker-compose-command-adaptor:latest}"
      build: ../../../../../cmd-adaptor-sns
      container_name: command-adaptor
-     environment: 
--- 
+     environment:
+--
 GitLab
 
 
 From 031a1ea370cf29ee5a3d7aefb8d0e65161ea7680 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:36:49 +0100
-Subject: [PATCH 09/56] chore: rerun pipeline
+Subject: [PATCH 09/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From 14697326368e1bf808524d2f251046e0a2dd8914 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:37:10 +0100
-Subject: [PATCH 10/56] chore: rerun pipeline
+Subject: [PATCH 10/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From 33ade900525b91582737f08fb450140f807d10de Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 12:14:22 +0100
-Subject: [PATCH 11/56] CST-2320 fix
+Subject: [PATCH 11/58] CST-2320 fix
 
 ---
  .drone.star | 3 ++-
@@ -1102,14 +1102,14 @@ index b45b25f7..47041184 100644
                  'COMMAND_ADAPTOR_IMAGE="$${COMMAND_ADAPTOR_IMAGE}" WAIT_CHECK="command_adaptor" docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml up --no-build command-adaptor' % COMMAND_ADAPTOR_NAME
              ],
              'environment': {
--- 
+--
 GitLab
 
 
 From 9016df3220268f51094f59dc71e781a5adfc3779 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 12:48:53 +0100
-Subject: [PATCH 12/56] CST-2320 fix
+Subject: [PATCH 12/58] CST-2320 fix
 
 ---
  .drone.star | 2 +-
@@ -1128,14 +1128,14 @@ index 47041184..17c0abc5 100644
                  'docker image inspect "$${COMMAND_ADAPTOR_IMAGE}" >/dev/null',
                  'COMMAND_ADAPTOR_IMAGE="$${COMMAND_ADAPTOR_IMAGE}" WAIT_CHECK="command_adaptor" docker-compose -f cmd-adaptor-%s-integration-tests/src/test/resources/docker-compose/docker-compose.yml up --no-build command-adaptor' % COMMAND_ADAPTOR_NAME
              ],
--- 
+--
 GitLab
 
 
 From 1d2de3b061ffd50c34185f5ef3d71b70d1d49f79 Mon Sep 17 00:00:00 2001
 From: Allen Conquest <allen.conquest1@homeoffice.gov.uk>
 Date: Mon, 3 Aug 2026 16:46:45 +0100
-Subject: [PATCH 13/56] Update versions for release
+Subject: [PATCH 13/58] Update versions for release
 
 ---
  cmd-adaptor-sns-avro/pom.xml              | 2 +-
@@ -1157,7 +1157,7 @@ index d3ab985c..033b2f78 100644
 -        <version>2.7.1-SNAPSHOT</version>
 +        <version>2.8.0</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns-avro</artifactId>
 diff --git a/cmd-adaptor-sns-common/pom.xml b/cmd-adaptor-sns-common/pom.xml
 index 5231ddd1..d36bc08f 100644
@@ -1170,7 +1170,7 @@ index 5231ddd1..d36bc08f 100644
 -        <version>2.7.1-SNAPSHOT</version>
 +        <version>2.8.0</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns-common</artifactId>
 diff --git a/cmd-adaptor-sns-integration-tests/pom.xml b/cmd-adaptor-sns-integration-tests/pom.xml
 index 897aca84..81b9fc36 100644
@@ -1183,7 +1183,7 @@ index 897aca84..81b9fc36 100644
 -        <version>2.7.1-SNAPSHOT</version>
 +        <version>2.8.0</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns-integration-testing</artifactId>
 diff --git a/cmd-adaptor-sns-test-common/pom.xml b/cmd-adaptor-sns-test-common/pom.xml
 index 30c98431..1dc100ea 100644
@@ -1196,7 +1196,7 @@ index 30c98431..1dc100ea 100644
 -        <version>2.7.1-SNAPSHOT</version>
 +        <version>2.8.0</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns-test-common</artifactId>
 diff --git a/cmd-adaptor-sns/pom.xml b/cmd-adaptor-sns/pom.xml
 index becf8ac4..36abc6ad 100644
@@ -1209,14 +1209,14 @@ index becf8ac4..36abc6ad 100644
 -        <version>2.7.1-SNAPSHOT</version>
 +        <version>2.8.0</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns</artifactId>
 diff --git a/pom.xml b/pom.xml
 index 95e3e567..8634623f 100644
 --- a/pom.xml
 +++ b/pom.xml
 @@ -6,7 +6,7 @@
- 
+
      <groupId>uk.gov.ho.dacc.fdp</groupId>
      <artifactId>fdp-cmd-adaptor-sns</artifactId>
 -    <version>2.7.1-SNAPSHOT</version>
@@ -1224,14 +1224,14 @@ index 95e3e567..8634623f 100644
      <packaging>pom</packaging>
      <name>fdp-cmd-adaptor-sns</name>
      <description>FDP Command Adaptor application and integration tests</description>
--- 
+--
 GitLab
 
 
 From 185fbe8ff134babfb5f6bd9d19b919147071c6fe Mon Sep 17 00:00:00 2001
 From: Allen Conquest <allen.conquest1@homeoffice.gov.uk>
 Date: Mon, 3 Aug 2026 16:50:08 +0100
-Subject: [PATCH 14/56] update changelog
+Subject: [PATCH 14/58] update changelog
 
 ---
  CHANGELOG.md                                  | 32 ++++++++++++++++
@@ -1244,9 +1244,9 @@ index dd2bf450..2a7d6342 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
 @@ -2,6 +2,38 @@
- 
+
  Changelog of fdp-cmd-adaptor-sns.
- 
+
 +## 2.8.0 (2026-08-03)
 +
 +### Other changes
@@ -1280,7 +1280,7 @@ index dd2bf450..2a7d6342 100644
 +
 +
  ## 2.7.0 (2026-07-10)
- 
+
  ### Other changes
 diff --git a/cmd-adaptor-sns/src/test/java/uk/gov/ho/dacc/fdp/integration/steps/IntegrationTestStepsStringTypeTest.java b/cmd-adaptor-sns/src/test/java/uk/gov/ho/dacc/fdp/integration/steps/IntegrationTestStepsStringTypeTest.java
 new file mode 100644
@@ -1326,14 +1326,14 @@ index 00000000..6ed9864c
 +    }
 +}
 +
--- 
+--
 GitLab
 
 
 From 00de92e28f1d8da0bb55a5ec00fa776ee2d817a6 Mon Sep 17 00:00:00 2001
 From: Allen Conquest <allen.conquest1@homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 09:24:35 +0100
-Subject: [PATCH 15/56] Update for next development version
+Subject: [PATCH 15/58] Update for next development version
 
 ---
  cmd-adaptor-sns-avro/pom.xml              | 2 +-
@@ -1355,7 +1355,7 @@ index 033b2f78..23175543 100644
 -        <version>2.8.0</version>
 +        <version>2.8.1-SNAPSHOT</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns-avro</artifactId>
 diff --git a/cmd-adaptor-sns-common/pom.xml b/cmd-adaptor-sns-common/pom.xml
 index d36bc08f..f4f30ed2 100644
@@ -1368,7 +1368,7 @@ index d36bc08f..f4f30ed2 100644
 -        <version>2.8.0</version>
 +        <version>2.8.1-SNAPSHOT</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns-common</artifactId>
 diff --git a/cmd-adaptor-sns-integration-tests/pom.xml b/cmd-adaptor-sns-integration-tests/pom.xml
 index 81b9fc36..5c347b7b 100644
@@ -1381,7 +1381,7 @@ index 81b9fc36..5c347b7b 100644
 -        <version>2.8.0</version>
 +        <version>2.8.1-SNAPSHOT</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns-integration-testing</artifactId>
 diff --git a/cmd-adaptor-sns-test-common/pom.xml b/cmd-adaptor-sns-test-common/pom.xml
 index 1dc100ea..14570860 100644
@@ -1394,7 +1394,7 @@ index 1dc100ea..14570860 100644
 -        <version>2.8.0</version>
 +        <version>2.8.1-SNAPSHOT</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns-test-common</artifactId>
 diff --git a/cmd-adaptor-sns/pom.xml b/cmd-adaptor-sns/pom.xml
 index 36abc6ad..40e2153b 100644
@@ -1407,14 +1407,14 @@ index 36abc6ad..40e2153b 100644
 -        <version>2.8.0</version>
 +        <version>2.8.1-SNAPSHOT</version>
      </parent>
- 
+
      <artifactId>cmd-adaptor-sns</artifactId>
 diff --git a/pom.xml b/pom.xml
 index 8634623f..48cf1842 100644
 --- a/pom.xml
 +++ b/pom.xml
 @@ -6,7 +6,7 @@
- 
+
      <groupId>uk.gov.ho.dacc.fdp</groupId>
      <artifactId>fdp-cmd-adaptor-sns</artifactId>
 -    <version>2.8.0</version>
@@ -1422,14 +1422,14 @@ index 8634623f..48cf1842 100644
      <packaging>pom</packaging>
      <name>fdp-cmd-adaptor-sns</name>
      <description>FDP Command Adaptor application and integration tests</description>
--- 
+--
 GitLab
 
 
 From b37518877a37db23389df7d0a1be3ccbeb523c7e Mon Sep 17 00:00:00 2001
 From: d-ziam <MohammadMeraj.zia@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 09:45:33 +0100
-Subject: [PATCH 16/56] CST-2326 - Incorporate Review comments by modifying the
+Subject: [PATCH 16/58] CST-2326 - Incorporate Review comments by modifying the
  poleV2Id
 
 ---
@@ -1441,64 +1441,64 @@ index bf3c09ee..be2e98be 100644
 --- a/cmd-adaptor-sns/src/test/java/uk/gov/ho/dacc/fdp/service/TracePoleV2IdRecordTransformerTest.java
 +++ b/cmd-adaptor-sns/src/test/java/uk/gov/ho/dacc/fdp/service/TracePoleV2IdRecordTransformerTest.java
 @@ -47,12 +47,12 @@ public class TracePoleV2IdRecordTransformerTest {
- 
+
      @Test
      public void transform_shouldCreateSpanWithExpectedMetadataForObjectCommand() {
 -        assertSpanCreated(buildObjectCommand(), "MAP_OBJECT_CMD", "SNSENS:O=123");
 +        assertSpanCreated(buildObjectCommand(), "MAP_OBJECT_CMD", "SNSENS:P=123,O=123");
      }
- 
+
      @Test
      public void transform_shouldCreateSpanWithExpectedMetadataForLocationCommand() {
 -        assertSpanCreated(buildLocationCommand(), "MAP_LOCATION_CMD", "SNSENS:L=123");
 +        assertSpanCreated(buildLocationCommand(), "MAP_LOCATION_CMD", "SNSENS:P=123,L=123");
      }
- 
+
      @Test
 @@ -116,7 +116,7 @@ public class TracePoleV2IdRecordTransformerTest {
      }
- 
+
      private CmdObjectPoleRecord buildObjectCommand() {
 -        PoleV2IdRecord poleV2IdRecord = PoleV2IdRecord.newBuilder().setId("SNSENS:O=123").build();
 +        PoleV2IdRecord poleV2IdRecord = PoleV2IdRecord.newBuilder().setId("SNSENS:P=123,O=123").build();
- 
+
          IdentityRecord identityRecord = IdentityRecord.newBuilder()
                  .setPoleId(PoleIdRecord.newBuilder().setV2(poleV2IdRecord).build())
 @@ -137,7 +137,7 @@ public class TracePoleV2IdRecordTransformerTest {
      }
- 
+
      private CmdLocationPoleRecord buildLocationCommand() {
 -        PoleV2IdRecord poleV2IdRecord = PoleV2IdRecord.newBuilder().setId("SNSENS:L=123").build();
 +        PoleV2IdRecord poleV2IdRecord = PoleV2IdRecord.newBuilder().setId("SNSENS:P=123,L=123").build();
- 
+
          IdentityRecord identityRecord = IdentityRecord.newBuilder()
                  .setPoleId(PoleIdRecord.newBuilder().setV2(poleV2IdRecord).build())
--- 
+--
 GitLab
 
 
 From fbb0123213b01380b40357c1c39233d58c44bc13 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:36:49 +0100
-Subject: [PATCH 17/56] chore: rerun pipeline
+Subject: [PATCH 17/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From d7c877433f1738cc430d7ebb8c9aaf655cd50d97 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 11:37:10 +0100
-Subject: [PATCH 18/56] chore: rerun pipeline
+Subject: [PATCH 18/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From 6dfcacae52c3fe994393dfcbea10245d07157212 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 15:35:04 +0100
-Subject: [PATCH 19/56] CST-2328 test containers
+Subject: [PATCH 19/58] CST-2328 test containers
 
 ---
  README.md                                     |  36 +-
@@ -1527,31 +1527,31 @@ index cf48b396..5d034f33 100644
 -   * BDD Cucumber Feature File driven E2E tests
 +   * Full containerised BDD Cucumber Feature File driven E2E tests
 +   * Supports both docker-compose and Testcontainers execution paths
- 
+
  ![Command Adaptor Pipeline](./cmd-adaptor-pipeline.png)
- 
+
 @@ -30,15 +30,14 @@ This will:
- 
+
  To run the e2e tests against the local stack setup actions will be required - see [cmd-adaptor-pnr-integration-tests](./cmd-adaptor-pnr-integration-tests/README.md)
- 
+
 -There are two Maven profiles for running integration tests:
 +There are two Maven profiles for the legacy docker-compose integration path:
- 
+
  Profile Name | Description |
  ------------ | ----------- |
  `local-int-cmd` | Starts containers, but not the Aker aggregators. |
  `local-int-snapshot` | Starts containers, including the Aker aggregators. |
- 
+
 -For example to run the integration suite against the command adaptor, run the
 -following command:
 +For example to run the integration suite against the command adaptor with docker-compose:
- 
+
  ```
  mvn -Plocal-int-cmd clean install
 @@ -50,6 +49,33 @@ To run the full test suite including against the aggregators, use:
  mvn -Plocal-int-snapshot clean install
  ```
- 
+
 +## Testcontainers (step-by-step)
 +
 +For local development, prefer the Testcontainers path because it does not rely
@@ -1588,10 +1588,10 @@ index 409d1b67..9dd45079 100644
 +++ b/cmd-adaptor-sns-integration-tests/README.md
 @@ -1,11 +1,36 @@
  # Command Adaptor Integration Tests
- 
+
 +This module supports both docker-compose and Testcontainers. For day-to-day
 +local runs, use Testcontainers first.
- 
+
 -To be able to run the integration tests on your local machine, you will need
 -to be connected to the ACP VPN and be logged into the JFrog Artifactory Docker
 -registry to be able to download the images for the FDP Aggregate images.  In
@@ -1625,13 +1625,13 @@ index 409d1b67..9dd45079 100644
 +To run snapshot tests with downstream aggregate images, connect to ACP VPN and
 +authenticate to JFrog Docker registry. In the login example below, `JFROG_TOKEN`
 +is set in your shell environment:
- 
+
  ```shell
  docker login -u ben.dalling@digital.homeoffice.gov.uk -p "${JFROG_TOKEN}" \
 @@ -13,21 +38,21 @@ docker login -u ben.dalling@digital.homeoffice.gov.uk -p "${JFROG_TOKEN}" \
  ```
- 
- 
+
+
 -By default, the `post-integration-test` will tear down the Docker Compose
 -infrastructure.  To ensure the containers remain running, use the command
 -below:
@@ -1639,21 +1639,21 @@ index 409d1b67..9dd45079 100644
 +
 +By default, `post-integration-test` tears down docker-compose infrastructure.
 +To keep compose containers running during iteration, use:
- 
+
  ```shell
  mvn integration-test -Plocal-int-snapshot
  ```
- 
+
 -When the Containers are running, you will be able to connect to the following
 -URLs:
 +When containers are running, you can connect to:
- 
+
  * Confluent Control Center - http://localhost:9021/clusters
- 
- 
+
+
 -To run Maven without the integration tests, use the following command:
 +To run Maven without integration tests:
- 
+
  ```shell
  mvn clean install
 diff --git a/cmd-adaptor-sns-integration-tests/pom.xml b/cmd-adaptor-sns-integration-tests/pom.xml
@@ -1669,7 +1669,7 @@ index 5c347b7b..e5352259 100644
 +        <failsafe.excludes>none</failsafe.excludes>
 +        <cucumber.filter.tags/>
      </properties>
- 
+
      <profiles>
 @@ -37,7 +41,7 @@
                  <skip.containers>false</skip.containers>
@@ -1741,7 +1741,7 @@ index 5c347b7b..e5352259 100644
 @@ -148,6 +194,19 @@
              <version>${project.version}</version>
          </dependency>
- 
+
 +        <dependency>
 +            <groupId>uk.gov.ho.dacc.fdp</groupId>
 +            <artifactId>cmd-adaptor-sns</artifactId>
@@ -1761,12 +1761,12 @@ index 5c347b7b..e5352259 100644
 @@ -192,10 +251,6 @@
              <optional>true</optional>
          </dependency>
- 
+
 -        <dependency>
 -            <groupId>org.slf4j</groupId>
 -            <artifactId>slf4j-simple</artifactId>
 -        </dependency>
- 
+
          <dependency>
              <groupId>uk.gov.ho.dacc.fdp</groupId>
 @@ -217,6 +272,12 @@
@@ -1875,7 +1875,7 @@ index 10b3d346..4dfdcebe 100644
      private static CdlzLandingRecord eoriCdlzLandingRecord;
 @@ -136,30 +151,75 @@ public class SnsSteps implements EventListener {
      ObjectMapper om = new ObjectMapper();
- 
+
      static {
 -        InputStream stream = Thread
 -                .currentThread()
@@ -1947,7 +1947,7 @@ index 10b3d346..4dfdcebe 100644
 +            RUNTIME_INITIALIZED.set(true);
          }
      }
- 
+
 +    private static void configureTopicNames(String suffix) {
 +        partyCmdTopic = PARTY_CMD_TOPIC_PREFIX + suffix;
 +        partySnapshotTopic = PARTY_SNAPSHOT_TOPIC_PREFIX + suffix;
@@ -1980,7 +1980,7 @@ index 10b3d346..4dfdcebe 100644
              final String registryServer = getSchemaRegistryUrl();
 @@ -204,7 +265,11 @@ public class SnsSteps implements EventListener {
              kafkaProducer = new KafkaProducer<>(producerConfig);
- 
+
              consumerConfig.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServer);
 -            consumerConfig.put(ConsumerConfig.GROUP_ID_CONFIG, "e2e-testing");
 +            if (TESTCONTAINERS_ENABLED) {
@@ -2022,7 +2022,7 @@ index 10b3d346..4dfdcebe 100644
 +            consumer.close();
 +        }
      }
- 
+
      @When("Readiness health check is completed")
      public void waitForReadiness() {
 +        ensureRuntimeInitialized();
@@ -2034,7 +2034,7 @@ index 10b3d346..4dfdcebe 100644
 +        String profileReadinessUrl = String.format("http://%s:%s/cmd-adaptor-sns-%s/health/readiness", host, port, topicSuffix);
 +        log.info("Waiting for readiness at {} or {}", readinessUrl, profileReadinessUrl);
          HttpClient client = HttpClient.newHttpClient();
- 
+
          int maxAttempts = 90; // up to ~90s
          int delayMs = 1000;
          for (int i = 1; i <= maxAttempts; i++) {
@@ -2067,7 +2067,7 @@ index 10b3d346..4dfdcebe 100644
              }
 @@ -356,8 +452,11 @@ public class SnsSteps implements EventListener {
      }
- 
+
      private boolean haveTestIdHeader(ConsumerRecord<?, ?> rec) {
 -        return rec.headers().lastHeader("testId") != null &&
 -                Arrays.equals(rec.headers().lastHeader("testId").value(), testId.getBytes(StandardCharsets.UTF_8));
@@ -2077,7 +2077,7 @@ index 10b3d346..4dfdcebe 100644
 +        }
 +        return Arrays.equals(rec.headers().lastHeader("testId").value(), testId.getBytes(StandardCharsets.UTF_8));
      }
- 
+
      private Object pollRecords(
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/KafkaSchemaRegistrySmokeTest.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/KafkaSchemaRegistrySmokeTest.java
 new file mode 100644
@@ -2211,13 +2211,13 @@ index 04a01032..9e659b2a 100644
  import org.testcontainers.junit.jupiter.Container;
  import org.testcontainers.junit.jupiter.Testcontainers;
  import redis.clients.jedis.Jedis;
- 
+
 -import java.time.Duration;
  import java.util.UUID;
- 
+
  import static org.junit.jupiter.api.Assertions.*;
 @@ -20,10 +18,7 @@ class MinimalRedisTest {
- 
+
      @Container
      static final GenericContainer<?> REDIS =
 -            new GenericContainer<>("redis:5.0.6")
@@ -2225,9 +2225,9 @@ index 04a01032..9e659b2a 100644
 -                    .waitingFor(Wait.forListeningPort())
 -                    .withStartupTimeout(Duration.ofSeconds(30));
 +            SnsTestcontainersEnvironment.redisContainer();
- 
+
      private Jedis client;
- 
+
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 new file mode 100644
 index 00000000..669fbb28
@@ -2760,7 +2760,7 @@ index e3a3d6a3..4079c31b 100644
 +++ b/cmd-adaptor-sns-integration-tests/src/test/resources/docker-compose/pre-integration-test/Dockerfile
 @@ -15,4 +15,5 @@ RUN apt-get clean \
    && pip install -r /tmp/requirements.txt
- 
+
  COPY app.py /usr/local/bin
 +COPY topic-templates.txt /usr/local/bin
  ENTRYPOINT /usr/local/bin/app.py
@@ -2777,18 +2777,18 @@ index d83c36b1..85a362e7 100755
  import time
  import urllib.error
 @@ -31,6 +32,8 @@ if "ADAPTOR_NAME" not in os.environ or len(os.environ["ADAPTOR_NAME"]) == 0:
- 
+
  ADAPTOR_NAME = os.environ["ADAPTOR_NAME"]
  logger.info(f"FDP Application Name = {ADAPTOR_NAME}")
 +TOPIC_SUFFIX = os.environ.get("FDP_APP_KAFKA_TOPIC_SUFFIX", "0")
 +TOPIC_TEMPLATE_PATH = Path("/usr/local/bin/topic-templates.txt")
- 
+
  if ADAPTOR_NAME == "crs":
      PARTITIONS = 3
 @@ -54,7 +57,7 @@ def create_kafka_topics(bootstrap_servers, topics):
              logger.error(e)
              time.sleep(1)
- 
+
 -    for topic_name in topic_names:
 +    for topic_name in topics:
          logger.info(f"Creating Kafka topic {topic_name} with {PARTITIONS} partitions.")
@@ -2796,8 +2796,8 @@ index d83c36b1..85a362e7 100755
              NewTopic(
 @@ -194,165 +197,29 @@ def wait_for_http(url, title, sleep_time=10, attempts=0, expected_response_codes
      assert url_connected, f"Timed out waiting for {url} to be ready."
- 
- 
+
+
 -topic_names = [
 -    # Command adaptor suspense topic.
 -    "fdp_cmd_suspense_0",
@@ -2980,7 +2980,7 @@ index d83c36b1..85a362e7 100755
 +
 +
 +topic_names = load_shared_topic_templates(TOPIC_TEMPLATE_PATH, TOPIC_SUFFIX)
- 
+
  # Input topics.
  if ADAPTOR_NAME == "brp":
 @@ -681,9 +548,8 @@ elif ADAPTOR_NAME == "sds":
@@ -2994,13 +2994,13 @@ index d83c36b1..85a362e7 100755
 +    pass
  else:
      topic_names.append(f"fdp-{ADAPTOR_NAME}-input_0")
- 
+
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/resources/features/E2E_Service.feature b/cmd-adaptor-sns-integration-tests/src/test/resources/features/E2E_Service.feature
 index e7f1ca14..2b10db16 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/resources/features/E2E_Service.feature
 +++ b/cmd-adaptor-sns-integration-tests/src/test/resources/features/E2E_Service.feature
 @@ -3,6 +3,9 @@ Feature: Test SNS Command Adaptor - Service
- 
+
    Scenario: ServiceRecord
      Given template StreamIngestRecord with the base file "sns-multiple.input"
 +    And template EoriCdlzLandingRecord with the base file "eori.input"
@@ -3009,14 +3009,14 @@ index e7f1ca14..2b10db16 100644
      When StreamIngestRecord source data is presented with attributes as per the template to the input topic with prefix fdp-sns-input
      Then 6 Service SNAPSHOTS will be emitted
      And one Service record for "SNS-ITEM" with following attributes
--- 
+--
 GitLab
 
 
 From 84bb1dd7f2d7361c19231ac05fa6cc4034bdb376 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 4 Aug 2026 15:35:04 +0100
-Subject: [PATCH 20/56] CST-2328 test containers
+Subject: [PATCH 20/58] CST-2328 test containers
 
 ---
  .../src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java | 7 ++++++-
@@ -3030,7 +3030,7 @@ index 4dfdcebe..997d4bef 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
 @@ -352,12 +352,14 @@ public class SnsSteps implements EventListener {
- 
+
          int maxAttempts = 90; // up to ~90s
          int delayMs = 1000;
 +        String lastFailure = "No successful readiness response";
@@ -3059,7 +3059,7 @@ index 4dfdcebe..997d4bef 100644
          }
 +        fail("Readiness health check did not reach UP within " + maxAttempts + " attempts. Last failure: " + lastFailure);
      }
- 
+
      private String getSchemaRegistryUrl() {
 @@ -501,7 +506,7 @@ public class SnsSteps implements EventListener {
          while (runlogRecords.size() < number && ++index < MAX_RETRIES_GET_CONSUMER_RECORDS) {
@@ -3085,7 +3085,7 @@ index 5d376a80..ab6f5688 100644
 @@ -38,6 +39,11 @@ class KafkaSchemaRegistrySmokeTest {
          SnsTestcontainersEnvironment.startInfrastructure();
      }
- 
+
 +    @AfterAll
 +    static void stopInfrastructure() {
 +        SnsTestcontainersEnvironment.stopAll();
@@ -3105,29 +3105,29 @@ index 9e659b2a..189ec033 100644
 -import org.testcontainers.junit.jupiter.Container;
  import org.testcontainers.junit.jupiter.Testcontainers;
  import redis.clients.jedis.Jedis;
- 
+
 @@ -16,7 +15,6 @@ import static org.junit.jupiter.api.Assertions.*;
  @Testcontainers(disabledWithoutDocker = true)
  class MinimalRedisTest {
- 
+
 -    @Container
      static final GenericContainer<?> REDIS =
              SnsTestcontainersEnvironment.redisContainer();
- 
+
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 index 669fbb28..956f9093 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 @@ -14,6 +14,7 @@ import org.testcontainers.utility.DockerImageName;
  import uk.gov.ho.dacc.fdp.CmdAdaptorApplication;
- 
+
  import java.net.URI;
 +import java.net.InetAddress;
  import java.net.http.HttpClient;
  import java.net.http.HttpRequest;
  import java.net.http.HttpResponse;
 @@ -269,7 +270,13 @@ public final class SnsTestcontainersEnvironment {
- 
+
      public static String getApplicationHost() {
          startApplication();
 -        return "localhost";
@@ -3139,16 +3139,16 @@ index 669fbb28..956f9093 100644
 +        }
 +        return InetAddress.getLoopbackAddress().getHostAddress();
      }
- 
+
      public static int getApplicationPort() {
--- 
+--
 GitLab
 
 
 From 8fef25cf82c6bf10a1bbd53ed9a3d823839f3739 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 13:25:12 +0100
-Subject: [PATCH 21/56] Restore topic-templates resource for
+Subject: [PATCH 21/58] Restore topic-templates resource for
  pre-integration-test image build
 
 ---
@@ -3320,14 +3320,14 @@ index 00000000..269d6e3e
 +fdp-sns-lookup-eori
 +fdp-sns-lookup-aeo
 +
--- 
+--
 GitLab
 
 
 From 5c26345c518a6232aa10fa58e9ce826037ef0eb7 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 15:11:33 +0100
-Subject: [PATCH 22/56] Improve Testcontainers failure diagnostics and shutdown
+Subject: [PATCH 22/58] Improve Testcontainers failure diagnostics and shutdown
  handling
 
 ---
@@ -3363,7 +3363,7 @@ index 997d4bef..3e098d8a 100644
              }
 @@ -328,7 +332,7 @@ public class SnsSteps implements EventListener {
              closeQuietly(kafkaConsumerRunlogCmd);
- 
+
              if (TESTCONTAINERS_ENABLED) {
 -                SnsTestcontainersEnvironment.stopAll();
 +                SnsTestcontainersEnvironment.shutdown();
@@ -3384,20 +3384,20 @@ index ab6f5688..2766ee8d 100644
  import org.junit.jupiter.api.Test;
 +import org.junit.jupiter.api.extension.ExtendWith;
  import org.testcontainers.junit.jupiter.Testcontainers;
- 
+
  import java.net.URI;
 @@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
- 
+
  @Tag("testcontainers")
  @Testcontainers(disabledWithoutDocker = true)
 +@ExtendWith(TestcontainersFailureDiagnostics.class)
  class KafkaSchemaRegistrySmokeTest {
- 
+
      @BeforeAll
 @@ -39,11 +40,6 @@ class KafkaSchemaRegistrySmokeTest {
          SnsTestcontainersEnvironment.startInfrastructure();
      }
- 
+
 -    @AfterAll
 -    static void stopInfrastructure() {
 -        SnsTestcontainersEnvironment.stopAll();
@@ -3409,7 +3409,7 @@ index ab6f5688..2766ee8d 100644
 @@ -117,4 +113,3 @@ class KafkaSchemaRegistrySmokeTest {
      }
  }
- 
+
 -
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/MinimalRedisTest.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/MinimalRedisTest.java
 index 189ec033..c6b9fe87 100644
@@ -3424,12 +3424,12 @@ index 189ec033..c6b9fe87 100644
  import org.testcontainers.junit.jupiter.Testcontainers;
  import redis.clients.jedis.Jedis;
 @@ -13,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
- 
+
  @Tag("testcontainers")
  @Testcontainers(disabledWithoutDocker = true)
 +@ExtendWith(TestcontainersFailureDiagnostics.class)
  class MinimalRedisTest {
- 
+
      static final GenericContainer<?> REDIS =
 @@ -66,4 +68,4 @@ class MinimalRedisTest {
          assertEquals(1L, deleted);
@@ -3443,7 +3443,7 @@ index 956f9093..0370bbd7 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 @@ -103,6 +103,7 @@ public final class SnsTestcontainersEnvironment {
- 
+
      private static volatile boolean infrastructureStarted = false;
      private static volatile boolean applicationStarted = false;
 +    private static volatile boolean networkClosed = false;
@@ -3452,7 +3452,7 @@ index 956f9093..0370bbd7 100644
      private static int applicationPort;
 @@ -111,6 +112,9 @@ public final class SnsTestcontainersEnvironment {
      }
- 
+
      public static synchronized void startInfrastructure() {
 +        if (networkClosed) {
 +            throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
@@ -3471,7 +3471,7 @@ index 956f9093..0370bbd7 100644
          }
      }
 @@ -197,11 +202,13 @@ public final class SnsTestcontainersEnvironment {
- 
+
              LOG.info("Started cmd-adaptor-sns test application on port {}", applicationPort);
          } catch (RuntimeException e) {
 +            dumpContainerLogs("application startup failure: " + e.getMessage());
@@ -3487,7 +3487,7 @@ index 956f9093..0370bbd7 100644
 @@ -237,6 +244,43 @@ public final class SnsTestcontainersEnvironment {
          }
      }
- 
+
 +    public static synchronized void shutdown() {
 +        stopAll();
 +        if (!networkClosed) {
@@ -3571,14 +3571,14 @@ index 00000000..f17e1dde
 +        }
 +    }
 +}
--- 
+--
 GitLab
 
 
 From 159494bb198d96a65c2807216c0b14b6666a7152 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 16:00:29 +0100
-Subject: [PATCH 23/56] CST-2328 Improve Testcontainers failure diagnostics and
+Subject: [PATCH 23/58] CST-2328 Improve Testcontainers failure diagnostics and
  shutdown handling
 
 ---
@@ -3599,7 +3599,7 @@ index e5352259..a4f61a5d 100644
 -        <cucumber.filter.tags/>
 +        <cucumber.filter.tags>not @ignore</cucumber.filter.tags>
      </properties>
- 
+
      <profiles>
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/IntegrationTest.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/IntegrationTest.java
 index c21db8b9..3457bf71 100644
@@ -3618,19 +3618,19 @@ index 3e098d8a..cbce8c9c 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
 @@ -182,6 +182,9 @@ public class SnsSteps implements EventListener {
- 
+
              if (TESTCONTAINERS_ENABLED) {
                  SnsTestcontainersEnvironment.startApplication();
 +                if (shouldStartAggregatorsForSelectedScenarios()) {
 +                    SnsTestcontainersEnvironment.startAggregators();
 +                }
- 
+
                  String bootstrap = SnsTestcontainersEnvironment.getKafkaBootstrapServers().replace("PLAINTEXT://", "");
                  properties.put(BOOTSTRAP_SERVER_HOST_PROPERTY, bootstrap.substring(0, bootstrap.lastIndexOf(':')));
 @@ -202,6 +205,14 @@ public class SnsSteps implements EventListener {
          }
      }
- 
+
 +    private static boolean shouldStartAggregatorsForSelectedScenarios() {
 +        String cucumberFilterTags = System.getProperty("cucumber.filter.tags", "").trim();
 +        boolean commandOnlyRun = cucumberFilterTags.contains("@cmd")
@@ -3647,7 +3647,7 @@ index 0370bbd7..156f426c 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 @@ -103,6 +103,7 @@ public final class SnsTestcontainersEnvironment {
- 
+
      private static volatile boolean infrastructureStarted = false;
      private static volatile boolean applicationStarted = false;
 +    private static volatile boolean aggregatorsStarted = false;
@@ -3659,13 +3659,13 @@ index 0370bbd7..156f426c 100644
          stopContainer(AGGREGATE_OBJECT);
          stopContainer(AGGREGATE_PARTY);
 +        aggregatorsStarted = false;
- 
+
          if (SCHEMA_REGISTRY.isRunning()) {
              SCHEMA_REGISTRY.stop();
 @@ -333,6 +335,14 @@ public final class SnsTestcontainersEnvironment {
              return;
          }
- 
+
 +        startAggregators();
 +    }
 +
@@ -3678,22 +3678,22 @@ index 0370bbd7..156f426c 100644
          startContainer(AGGREGATE_PARTY);
          waitForAggregateReadiness(AGGREGATE_PARTY, "party");
 @@ -348,6 +358,8 @@ public final class SnsTestcontainersEnvironment {
- 
+
          startContainer(AGGREGATE_SERVICE);
          waitForAggregateReadiness(AGGREGATE_SERVICE, "service");
 +
 +        aggregatorsStarted = true;
      }
- 
+
      private static void waitForAggregateReadiness(GenericContainer<?> container, String aggregateType) {
--- 
+--
 GitLab
 
 
 From 524abf86df48d267efd8289c687438dc69ba0318 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 16:11:43 +0100
-Subject: [PATCH 24/56] CST-1993 optimise CI with Testcontainers
+Subject: [PATCH 24/58] CST-1993 optimise CI with Testcontainers
 
 ---
  .drone.star                                   | 175 +++---------------
@@ -3935,7 +3935,7 @@ index 17c0abc5..c506aeea 100644
 +            }
          }
      )
- 
+
 diff --git a/cmd-adaptor-sns-integration-tests/pom.xml b/cmd-adaptor-sns-integration-tests/pom.xml
 index a4f61a5d..c8a8dfc9 100644
 --- a/cmd-adaptor-sns-integration-tests/pom.xml
@@ -4019,7 +4019,7 @@ index cbce8c9c..3227d858 100644
  import java.util.*;
  import java.util.concurrent.atomic.AtomicBoolean;
 +import java.util.concurrent.atomic.AtomicInteger;
- 
+
  import static org.junit.Assert.*;
  import static uk.gov.ho.dacc.fdp.assertions.EventAssertions.assertEventRecord;
 @@ -105,6 +107,9 @@ public class SnsSteps implements EventListener {
@@ -4033,7 +4033,7 @@ index cbce8c9c..3227d858 100644
      private static final String PARTY_SNAPSHOT_TOPIC_PREFIX = "fdp_party_snapshot_";
      private static final String OBJECT_CMD_TOPIC_PREFIX = "fdp_object_cmd_";
 @@ -262,6 +267,8 @@ public class SnsSteps implements EventListener {
- 
+
      @Override
      public void setEventPublisher(EventPublisher eventPublisher) {
 +        eventPublisher.registerHandlerFor(TestCaseFinished.class,
@@ -4051,7 +4051,7 @@ index cbce8c9c..3227d858 100644
 +            }
          });
      }
- 
+
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 index 156f426c..b64bc87d 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
@@ -4069,13 +4069,13 @@ index 156f426c..b64bc87d 100644
  import java.util.UUID;
  import java.util.concurrent.TimeUnit;
 +import java.util.stream.Stream;
- 
+
  public final class SnsTestcontainersEnvironment {
      private static final Logger LOG = LoggerFactory.getLogger(SnsTestcontainersEnvironment.class);
 @@ -101,7 +103,8 @@ public final class SnsTestcontainersEnvironment {
              "service", 7105, 8105, 9015, "service-aggregate");
- 
- 
+
+
 -    private static volatile boolean infrastructureStarted = false;
 +    private static volatile boolean redisStarted = false;
 +    private static volatile boolean messagingStarted = false;
@@ -4084,7 +4084,7 @@ index 156f426c..b64bc87d 100644
      private static volatile boolean networkClosed = false;
 @@ -113,10 +116,8 @@ public final class SnsTestcontainersEnvironment {
      }
- 
+
      public static synchronized void startInfrastructure() {
 -        if (networkClosed) {
 -            throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
@@ -4096,7 +4096,7 @@ index 156f426c..b64bc87d 100644
          }
          if (infrastructureStartupFailure != null) {
 @@ -125,16 +126,16 @@ public final class SnsTestcontainersEnvironment {
- 
+
          LOG.info("Starting SNS Testcontainers infrastructure");
          try {
 -            REDIS.start();
@@ -4107,7 +4107,7 @@ index 156f426c..b64bc87d 100644
              SCHEMA_REGISTRY.start();
 -            infrastructureStarted = true;
 +            messagingStarted = true;
- 
+
              createRequiredTopics();
              validateSchemaRegistryRoundTrip();
          } catch (RuntimeException e) {
@@ -4119,7 +4119,7 @@ index 156f426c..b64bc87d 100644
 @@ -142,6 +143,22 @@ public final class SnsTestcontainersEnvironment {
          }
      }
- 
+
 +    public static synchronized void startRedis() {
 +        assertEnvironmentOpen();
 +        if (redisStarted) {
@@ -4151,17 +4151,17 @@ index 156f426c..b64bc87d 100644
          }
 @@ -284,7 +302,7 @@ public final class SnsTestcontainersEnvironment {
      }
- 
+
      public static GenericContainer<?> redisContainer() {
 -        startInfrastructure();
 +        startRedis();
          return REDIS;
      }
- 
+
 @@ -343,21 +361,22 @@ public final class SnsTestcontainersEnvironment {
              return;
          }
- 
+
 -        LOG.info("Starting SNS downstream aggregate containers for snapshot scenarios");
 -        startContainer(AGGREGATE_PARTY);
 -        waitForAggregateReadiness(AGGREGATE_PARTY, "party");
@@ -4193,13 +4193,13 @@ index 156f426c..b64bc87d 100644
 +                Map.entry(AGGREGATE_SERVICE, "service"))
 +                .parallel()
 +                .forEach(entry -> waitForAggregateReadiness(entry.getKey(), entry.getValue()));
- 
+
          aggregatorsStarted = true;
      }
 @@ -408,18 +427,18 @@ public final class SnsTestcontainersEnvironment {
          }
      }
- 
+
 -    private static void startContainer(GenericContainer<?> container) {
 -        if (!container.isRunning()) {
 -            container.start();
@@ -4211,7 +4211,7 @@ index 156f426c..b64bc87d 100644
              container.stop();
          }
      }
- 
+
 +    private static void assertEnvironmentOpen() {
 +        if (networkClosed) {
 +            throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
@@ -4270,14 +4270,14 @@ index 00000000..6dd96793
 +    }
 +}
 +
--- 
+--
 GitLab
 
 
 From 1c4cfabc29d5299c79cd63e291a125d0a653b1c6 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 16:51:16 +0100
-Subject: [PATCH 25/56] CST-2328 fix
+Subject: [PATCH 25/58] CST-2328 fix
 
 ---
  .drone.star | 2 +-
@@ -4296,14 +4296,14 @@ index c506aeea..f94bd94f 100644
                  'TEST_START=$(date +%s)',
                  'mvn clean verify -Pci-testcontainers-snapshot',
                  'TEST_DURATION=$(($(date +%s)-TEST_START))',
--- 
+--
 GitLab
 
 
 From f8f93ea31564567b1314349d6e5184d7b9fb93ee Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 17:37:21 +0100
-Subject: [PATCH 26/56] CST-2328 fix
+Subject: [PATCH 26/58] CST-2328 fix
 
 ---
  cmd-adaptor-sns-integration-tests/README.md   |  9 +++++
@@ -4319,7 +4319,7 @@ index 9dd45079..165a37ca 100644
 @@ -26,6 +26,15 @@ mvn -pl cmd-adaptor-sns-integration-tests -am clean verify -Plocal-testcontainer
  For CI-style names, the same runs are available as
  `-Pci-testcontainers-cmd` and `-Pci-testcontainers-snapshot`.
- 
+
 +These profiles require a reachable Docker daemon with a supported Docker API.
 +If Docker is unavailable, the Testcontainers Cucumber suite is skipped by
 +default instead of failing during bootstrap. To make Docker availability a hard
@@ -4330,7 +4330,7 @@ index 9dd45079..165a37ca 100644
 +```
 +
  ## Snapshot profile prerequisites
- 
+
  To run snapshot tests with downstream aggregate images, connect to ACP VPN and
 diff --git a/cmd-adaptor-sns-integration-tests/pom.xml b/cmd-adaptor-sns-integration-tests/pom.xml
 index c8a8dfc9..d2393515 100644
@@ -4372,7 +4372,7 @@ index 3457bf71..e316883b 100644
  import org.junit.runner.RunWith;
 +import org.junit.rules.ExternalResource;
 +import uk.gov.ho.dacc.fdp.testcontainers.SnsTestcontainersEnvironment;
- 
+
  @Slf4j
  @RunWith(Cucumber.class)
 @@ -12,4 +15,11 @@ import org.junit.runner.RunWith;
@@ -4392,7 +4392,7 @@ index b64bc87d..7f533108 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 @@ -2,10 +2,12 @@ package uk.gov.ho.dacc.fdp.testcontainers;
- 
+
  import org.apache.kafka.clients.admin.AdminClient;
  import org.apache.kafka.clients.admin.NewTopic;
 +import org.junit.Assume;
@@ -4414,7 +4414,7 @@ index b64bc87d..7f533108 100644
 +            Boolean.parseBoolean(System.getProperty("sns.testcontainers.skip-if-docker-unavailable", "true"));
      private static final boolean AGGREGATORS_ENABLED =
              Boolean.parseBoolean(System.getProperty("sns.testcontainers.aggregators.enabled", "false"));
- 
+
 @@ -108,6 +114,7 @@ public final class SnsTestcontainersEnvironment {
      private static volatile boolean applicationStarted = false;
      private static volatile boolean aggregatorsStarted = false;
@@ -4426,7 +4426,7 @@ index b64bc87d..7f533108 100644
 @@ -115,8 +122,34 @@ public final class SnsTestcontainersEnvironment {
      private SnsTestcontainersEnvironment() {
      }
- 
+
 +    public static synchronized void assumeDockerAvailableIfEnabled() {
 +        if (!TESTCONTAINERS_ENABLED || dockerAvailabilityChecked) {
 +            return;
@@ -4458,14 +4458,14 @@ index b64bc87d..7f533108 100644
          if (messagingStarted) {
              return;
          }
--- 
+--
 GitLab
 
 
 From 7635b7ad32a2d7d777c0bfdaa56cc6242ec8c4f1 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 18:32:54 +0100
-Subject: [PATCH 27/56] CST-2328 fix
+Subject: [PATCH 27/58] CST-2328 fix
 
 ---
  .drone.star                                   |  30 +++-
@@ -4482,7 +4482,7 @@ index f94bd94f..1e84d4c8 100644
 @@ -249,6 +249,34 @@ def ci_pipeline(ctx):
          }
      )
- 
+
 +    response = add_pipeline_step(
 +        response,
 +        {
@@ -4721,7 +4721,7 @@ index 7f533108..5344b431 100644
 @@ -365,6 +365,22 @@ public final class SnsTestcontainersEnvironment {
          return RUN_ID;
      }
- 
+
 +    static Network sharedNetwork() {
 +        return NETWORK;
 +    }
@@ -4741,14 +4741,14 @@ index 7f533108..5344b431 100644
      public static String getApplicationHost() {
          startApplication();
          if (applicationContext != null) {
--- 
+--
 GitLab
 
 
 From c7f91a6c71ee90646e2bb383b2f2cec308c88f33 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 19:18:38 +0100
-Subject: [PATCH 28/56] CST-2328 fix
+Subject: [PATCH 28/58] CST-2328 fix
 
 ---
  .drone.star                               | 2 ++
@@ -4815,14 +4815,14 @@ index ac318c1a..ad777631 100644
              </properties>
          </profile>
          <profile>
--- 
+--
 GitLab
 
 
 From e383d4ed61938d7e8f91ef239d5b4571bc382a25 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 19:58:34 +0100
-Subject: [PATCH 29/56] CST-2328 fix
+Subject: [PATCH 29/58] CST-2328 fix
 
 ---
  cmd-adaptor-sns-integration-tests/pom.xml | 2 +-
@@ -4834,21 +4834,21 @@ index ad777631..235dcb19 100644
 +++ b/cmd-adaptor-sns-integration-tests/pom.xml
 @@ -13,7 +13,7 @@
      <artifactId>cmd-adaptor-sns-integration-testing</artifactId>
- 
+
      <properties>
 -        <testcontainers.version>1.19.8</testcontainers.version>
 +        <testcontainers.version>1.20.4</testcontainers.version>
          <jedis.version>4.4.3</jedis.version>
          <surefire.excludedGroups>testcontainers</surefire.excludedGroups>
          <sns.testcontainers.enabled>false</sns.testcontainers.enabled>
--- 
+--
 GitLab
 
 
 From 55789869cc0575808159af0d5d389022bdabc62a Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 20:26:43 +0100
-Subject: [PATCH 30/56] CST-2328 fix
+Subject: [PATCH 30/58] CST-2328 fix
 
 ---
  .drone.star | 6 ++++--
@@ -4892,14 +4892,14 @@ index 08a25773..0462907c 100644
                  'TESTCONTAINERS_HOST_OVERRIDE': 'docker',
                  'TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX': 'docker.digital.homeoffice.gov.uk/',
                  'TESTCONTAINERS_RYUK_DISABLED': 'true'
--- 
+--
 GitLab
 
 
 From 0de522273da271add4367af9c2528c324b37a015 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 20:55:13 +0100
-Subject: [PATCH 31/56] CST-2328 fix
+Subject: [PATCH 31/58] CST-2328 fix
 
 ---
  .drone.star                               | 4 ++--
@@ -4958,14 +4958,14 @@ index 235dcb19..7a338711 100644
                              </systemPropertyVariables>
                              <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                              <excludes>
--- 
+--
 GitLab
 
 
 From 4beef86f2867962e6ca9b8a1a9f50ab357061928 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 21:21:52 +0100
-Subject: [PATCH 32/56] CST-2328 fix
+Subject: [PATCH 32/58] CST-2328 fix
 
 ---
  .../BuiltImageRuntimeIntegrationTest.java     | 27 +++++++++++++++++++
@@ -4982,7 +4982,7 @@ index 7c9545cd..86b05ce9 100644
 +import java.nio.file.Files;
 +import java.nio.file.Path;
  import java.time.Duration;
- 
+
  import static org.junit.jupiter.api.Assertions.assertTrue;
 @@ -27,11 +29,14 @@ class BuiltImageRuntimeIntegrationTest {
      private static final String IMAGE_UNDER_TEST =
@@ -4990,19 +4990,19 @@ index 7c9545cd..86b05ce9 100644
      private static final Duration READINESS_TIMEOUT = Duration.ofSeconds(120);
 +    private static final String REQUIRED_DOCKER_API_VERSION =
 +            System.getProperty("sns.runtime.required.docker.api.version", "1.41");
- 
+
      private static GenericContainer<?> commandAdaptor;
- 
+
      @BeforeAll
      static void beforeAll() {
 +        configureDockerClientDefaults();
          ensureDockerImageExists(IMAGE_UNDER_TEST);
- 
+
          SnsTestcontainersEnvironment.startInfrastructure();
 @@ -59,6 +64,28 @@ class BuiltImageRuntimeIntegrationTest {
          }
      }
- 
+
 +    private static void configureDockerClientDefaults() {
 +        // CI fallback: if socket is unavailable and host is not provided, default to Drone dind service.
 +        if (System.getenv("DOCKER_HOST") == null && System.getProperty("docker.host") == null
@@ -5028,14 +5028,14 @@ index 7c9545cd..86b05ce9 100644
      @AfterAll
      static void afterAll() {
          if (commandAdaptor != null && commandAdaptor.isRunning()) {
--- 
+--
 GitLab
 
 
 From c8e9dcc57d0a76427547867c9352c87900549c15 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 21:49:55 +0100
-Subject: [PATCH 33/56] CST-2328 fix
+Subject: [PATCH 33/58] CST-2328 fix
 
 ---
  .drone.star                                      |  2 --
@@ -5075,7 +5075,7 @@ index 5344b431..23046b16 100644
  import org.testcontainers.images.builder.Transferable;
  import org.testcontainers.utility.DockerImageName;
 @@ -159,6 +160,7 @@ public final class SnsTestcontainersEnvironment {
- 
+
          LOG.info("Starting SNS Testcontainers infrastructure");
          try {
 +            verifyRequiredDependencyImagesResolvable();
@@ -5085,7 +5085,7 @@ index 5344b431..23046b16 100644
 @@ -482,6 +484,20 @@ public final class SnsTestcontainersEnvironment {
          }
      }
- 
+
 +    private static void verifyRequiredDependencyImagesResolvable() {
 +        List<String> requiredImages = List.of(REDIS_IMAGE, ZOOKEEPER_IMAGE, KAFKA_IMAGE, SCHEMA_REGISTRY_IMAGE);
 +        for (String requiredImage : requiredImages) {
@@ -5103,14 +5103,14 @@ index 5344b431..23046b16 100644
      private static void assertEnvironmentOpen() {
          if (networkClosed) {
              throw new IllegalStateException("SNS Testcontainers environment has already been shut down");
--- 
+--
 GitLab
 
 
 From 8b40325921d9aea48d55674985136c51e849e4f2 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 22:34:18 +0100
-Subject: [PATCH 34/56] CST-2328 fix
+Subject: [PATCH 34/58] CST-2328 fix
 
 ---
  .drone.star                                   |  4 +--
@@ -5197,7 +5197,7 @@ index 86b05ce9..956f9a7b 100644
 -import java.nio.file.Files;
 -import java.nio.file.Path;
  import java.time.Duration;
- 
+
  import static org.junit.jupiter.api.Assertions.assertTrue;
 @@ -29,14 +27,11 @@ class BuiltImageRuntimeIntegrationTest {
      private static final String IMAGE_UNDER_TEST =
@@ -5205,19 +5205,19 @@ index 86b05ce9..956f9a7b 100644
      private static final Duration READINESS_TIMEOUT = Duration.ofSeconds(120);
 -    private static final String REQUIRED_DOCKER_API_VERSION =
 -            System.getProperty("sns.runtime.required.docker.api.version", "1.41");
- 
+
      private static GenericContainer<?> commandAdaptor;
- 
+
      @BeforeAll
      static void beforeAll() {
 -        configureDockerClientDefaults();
          ensureDockerImageExists(IMAGE_UNDER_TEST);
- 
+
          SnsTestcontainersEnvironment.startInfrastructure();
 @@ -64,27 +59,6 @@ class BuiltImageRuntimeIntegrationTest {
          }
      }
- 
+
 -    private static void configureDockerClientDefaults() {
 -        // CI fallback: if socket is unavailable and host is not provided, default to Drone dind service.
 -        if (System.getenv("DOCKER_HOST") == null && System.getProperty("docker.host") == null
@@ -5239,7 +5239,7 @@ index 86b05ce9..956f9a7b 100644
 -                System.getenv("DOCKER_HOST"),
 -                System.getenv("DOCKER_API_VERSION"));
 -    }
- 
+
      @AfterAll
      static void afterAll() {
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
@@ -5252,13 +5252,13 @@ index 23046b16..019c869c 100644
              Boolean.parseBoolean(System.getProperty("sns.testcontainers.aggregators.enabled", "false"));
 +    private static final int EXPECTED_SCENARIOS =
 +            Integer.parseInt(System.getProperty("sns.testcontainers.expected-scenarios", "0"));
- 
+
      private static final String KAFKA_ALIAS = "kafka";
      private static final String ZOOKEEPER_ALIAS = "zookeeper";
 @@ -128,6 +130,13 @@ public final class SnsTestcontainersEnvironment {
              return;
          }
- 
+
 +        if (System.getenv("DRONE") != null && EXPECTED_SCENARIOS > 0 && SKIP_IF_DOCKER_UNAVAILABLE) {
 +            throw new IllegalStateException(
 +                    "CI Testcontainers suite is misconfigured: sns.testcontainers.skip-if-docker-unavailable=true "
@@ -5269,14 +5269,14 @@ index 23046b16..019c869c 100644
          String message = "SNS Testcontainers integration tests require a reachable Docker daemon with a supported "
                  + "Docker API. Set sns.testcontainers.enabled=false, use a non-Testcontainers profile, or provide "
                  + "Docker access to run these tests.";
--- 
+--
 GitLab
 
 
 From 57639cc8e0523fd9b41864b3e6cc6b478059796b Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 22:52:16 +0100
-Subject: [PATCH 35/56] CST-2328 remove prototype files
+Subject: [PATCH 35/58] CST-2328 remove prototype files
 
 ---
  .../Dockerfile.layer-order-prototype          |  37 ----
@@ -5678,14 +5678,14 @@ index a73a5760..00000000
 -  exit 1
 -fi
 \ No newline at end of file
--- 
+--
 GitLab
 
 
 From f019e6d4fc91040593b71fb4dbcc43f684188336 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 22:56:28 +0100
-Subject: [PATCH 36/56] CST-2328 remove prototype files
+Subject: [PATCH 36/58] CST-2328 remove prototype files
 
 ---
  .../BuiltImageRuntimeIntegrationTest.java     | 142 ------------------
@@ -6081,14 +6081,14 @@ index f17e1dde..00000000
 -        }
 -    }
 -}
--- 
+--
 GitLab
 
 
 From 77559cefb77a8e7f0ee26c9f5ee807b247f730ce Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Mon, 10 Aug 2026 23:10:29 +0100
-Subject: [PATCH 37/56] CST-2328 remove prototype files rollback
+Subject: [PATCH 37/58] CST-2328 remove prototype files rollback
 
 ---
  .../BuiltImageRuntimeIntegrationTest.java     | 142 ++++++++++++++++++
@@ -6282,14 +6282,14 @@ index 00000000..f17e1dde
 +        }
 +    }
 +}
--- 
+--
 GitLab
 
 
 From 4bf511a4663fbe4895834fb33d190676ca9e6363 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 11 Aug 2026 00:12:22 +0100
-Subject: [PATCH 38/56] CST-2328 remove prototype files rollback
+Subject: [PATCH 38/58] CST-2328 remove prototype files rollback
 
 ---
  README.md                                     |  10 +-
@@ -6309,7 +6309,7 @@ index 5d034f33..55b2b762 100644
 @@ -54,19 +54,13 @@ mvn -Plocal-int-snapshot clean install
  For local development, prefer the Testcontainers path because it does not rely
  on the docker-compose lifecycle in this module.
- 
+
 -1) Run Testcontainers smoke tests (Redis + Kafka + Schema Registry wiring):
 -
 -```bash
@@ -6318,24 +6318,24 @@ index 5d034f33..55b2b762 100644
 -
 -2) Run command-path integration tests with Testcontainers:
 +1) Run command-path integration tests with Testcontainers:
- 
+
  ```bash
  mvn -pl cmd-adaptor-sns-integration-tests -am clean verify -Plocal-testcontainers
  ```
- 
+
 -3) Run full snapshot integration tests (includes downstream aggregates in
 +2) Run full snapshot integration tests (includes downstream aggregates in
  Testcontainers):
- 
+
  ```bash
 diff --git a/cmd-adaptor-sns-integration-tests/README.md b/cmd-adaptor-sns-integration-tests/README.md
 index 165a37ca..928eacb2 100644
 --- a/cmd-adaptor-sns-integration-tests/README.md
 +++ b/cmd-adaptor-sns-integration-tests/README.md
 @@ -5,19 +5,13 @@ local runs, use Testcontainers first.
- 
+
  ## Testcontainers (step-by-step)
- 
+
 -1) Run smoke tests for base infra wiring:
 -
 -```bash
@@ -6344,14 +6344,14 @@ index 165a37ca..928eacb2 100644
 -
 -2) Run command-path Cucumber integration tests:
 +1) Run command-path Cucumber integration tests:
- 
+
  ```bash
  mvn -pl cmd-adaptor-sns-integration-tests -am clean verify -Plocal-testcontainers
  ```
- 
+
 -3) Run snapshot/full integration tests with downstream aggregates:
 +2) Run snapshot/full integration tests with downstream aggregates:
- 
+
  ```bash
  mvn -pl cmd-adaptor-sns-integration-tests -am clean verify -Plocal-testcontainers-snapshot
 diff --git a/cmd-adaptor-sns-integration-tests/pom.xml b/cmd-adaptor-sns-integration-tests/pom.xml
@@ -6359,7 +6359,7 @@ index 7841f314..cb7cf3de 100644
 --- a/cmd-adaptor-sns-integration-tests/pom.xml
 +++ b/cmd-adaptor-sns-integration-tests/pom.xml
 @@ -14,7 +14,6 @@
- 
+
      <properties>
          <testcontainers.version>1.20.4</testcontainers.version>
 -        <jedis.version>4.4.3</jedis.version>
@@ -6378,7 +6378,7 @@ index 7841f314..cb7cf3de 100644
 @@ -285,7 +284,7 @@
              <scope>test</scope>
          </dependency>
- 
+
 -        <!-- T4.2: Testcontainers Redis smoke/wiring pilot -->
 +        <!-- Testcontainers dependencies -->
          <dependency>
@@ -6394,9 +6394,9 @@ index 7841f314..cb7cf3de 100644
 -            <version>${jedis.version}</version>
 -            <scope>test</scope>
 -        </dependency>
- 
+
      </dependencies>
- 
+
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 index 019c869c..06dc565b 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
@@ -6417,24 +6417,24 @@ index 019c869c..06dc565b 100644
      private static final String TOPIC_SUFFIX = "tc" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
      private static final String RUN_ID = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 -    private static final String SHARED_TOPIC_TEMPLATE_RESOURCE = "docker-compose/pre-integration-test/topic-templates.txt";
- 
+
      private static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
              .withNetwork(NETWORK)
 @@ -514,9 +509,7 @@ public final class SnsTestcontainersEnvironment {
      }
- 
+
      private static void createRequiredTopics() {
 -        Set<String> topicNames = new LinkedHashSet<>(loadSharedTopicTemplates(TOPIC_SUFFIX));
 -        topicNames.add("landing-1");
 -        topicNames.add("landing-413");
 +        Set<String> topicNames = new LinkedHashSet<>(requiredTopicNames());
- 
+
          List<NewTopic> topics = new ArrayList<>();
          for (String topicName : topicNames) {
 @@ -533,29 +526,143 @@ public final class SnsTestcontainersEnvironment {
          }
      }
- 
+
 -    private static List<String> loadSharedTopicTemplates(String topicSuffix) {
 -        InputStream stream = SnsTestcontainersEnvironment.class.getClassLoader()
 -                .getResourceAsStream(SHARED_TOPIC_TEMPLATE_RESOURCE);
@@ -6596,7 +6596,7 @@ index 019c869c..06dc565b 100644
 +        requiredTopics.add("landing-413");
 +        return requiredTopics;
      }
- 
+
      private static void validateSchemaRegistryRoundTrip() {
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/resources/docker-compose/pre-integration-test/Dockerfile b/cmd-adaptor-sns-integration-tests/src/test/resources/docker-compose/pre-integration-test/Dockerfile
 index 4079c31b..e3a3d6a3 100644
@@ -6604,7 +6604,7 @@ index 4079c31b..e3a3d6a3 100644
 +++ b/cmd-adaptor-sns-integration-tests/src/test/resources/docker-compose/pre-integration-test/Dockerfile
 @@ -15,5 +15,4 @@ RUN apt-get clean \
    && pip install -r /tmp/requirements.txt
- 
+
  COPY app.py /usr/local/bin
 -COPY topic-templates.txt /usr/local/bin
  ENTRYPOINT /usr/local/bin/app.py
@@ -6621,18 +6621,18 @@ index 85a362e7..b72e4b37 100755
  import time
  import urllib.error
 @@ -32,8 +31,6 @@ if "ADAPTOR_NAME" not in os.environ or len(os.environ["ADAPTOR_NAME"]) == 0:
- 
+
  ADAPTOR_NAME = os.environ["ADAPTOR_NAME"]
  logger.info(f"FDP Application Name = {ADAPTOR_NAME}")
 -TOPIC_SUFFIX = os.environ.get("FDP_APP_KAFKA_TOPIC_SUFFIX", "0")
 -TOPIC_TEMPLATE_PATH = Path("/usr/local/bin/topic-templates.txt")
- 
+
  if ADAPTOR_NAME == "crs":
      PARTITIONS = 3
 @@ -197,29 +194,165 @@ def wait_for_http(url, title, sleep_time=10, attempts=0, expected_response_codes
      assert url_connected, f"Timed out waiting for {url} to be ready."
- 
- 
+
+
 -def load_shared_topic_templates(template_path, topic_suffix):
 -    topic_names_local = []
 -
@@ -6815,7 +6815,7 @@ index 85a362e7..b72e4b37 100755
 +    "from-matching-wash-virtual-0",
 +    "from-matching-wash-transport-0",
 +]
- 
+
  # Input topics.
  if ADAPTOR_NAME == "brp":
 @@ -548,8 +681,9 @@ elif ADAPTOR_NAME == "sds":
@@ -6829,7 +6829,7 @@ index 85a362e7..b72e4b37 100755
 +    topic_names.append("fdp-sns-lookup-aeo")
  else:
      topic_names.append(f"fdp-{ADAPTOR_NAME}-input_0")
- 
+
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/resources/docker-compose/pre-integration-test/topic-templates.txt b/cmd-adaptor-sns-integration-tests/src/test/resources/docker-compose/pre-integration-test/topic-templates.txt
 deleted file mode 100644
 index 269d6e3e..00000000
@@ -6994,14 +6994,14 @@ index 269d6e3e..00000000
 -fdp-sns-lookup-eori
 -fdp-sns-lookup-aeo
 -
--- 
+--
 GitLab
 
 
 From 263591eae2437a0b8306c91aa46d55f7c5ba4149 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Tue, 11 Aug 2026 10:26:43 +0100
-Subject: [PATCH 39/56] CST-2328 remove unnecessary changes
+Subject: [PATCH 39/58] CST-2328 remove unnecessary changes
 
 ---
  .drone.star                                         | 13 +++----------
@@ -7054,7 +7054,7 @@ index 3227d858..666b2e2d 100644
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/steps/SnsSteps.java
 @@ -483,11 +483,8 @@ public class SnsSteps implements EventListener {
      }
- 
+
      private boolean haveTestIdHeader(ConsumerRecord<?, ?> rec) {
 -        if (rec.headers().lastHeader("testId") == null) {
 -            // Some local Testcontainers runs do not propagate the originating header through all pipelines.
@@ -7064,7 +7064,7 @@ index 3227d858..666b2e2d 100644
 +        return rec.headers().lastHeader("testId") != null &&
 +                Arrays.equals(rec.headers().lastHeader("testId").value(), testId.getBytes(StandardCharsets.UTF_8));
      }
- 
+
      private Object pollRecords(
 @@ -532,7 +529,7 @@ public class SnsSteps implements EventListener {
          while (runlogRecords.size() < number && ++index < MAX_RETRIES_GET_CONSUMER_RECORDS) {
@@ -7082,7 +7082,7 @@ index b72e4b37..d83c36b1 100755
 @@ -54,7 +54,7 @@ def create_kafka_topics(bootstrap_servers, topics):
              logger.error(e)
              time.sleep(1)
- 
+
 -    for topic_name in topics:
 +    for topic_name in topic_names:
          logger.info(f"Creating Kafka topic {topic_name} with {PARTITIONS} partitions.")
@@ -7093,7 +7093,7 @@ index 2b10db16..e7f1ca14 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/resources/features/E2E_Service.feature
 +++ b/cmd-adaptor-sns-integration-tests/src/test/resources/features/E2E_Service.feature
 @@ -3,9 +3,6 @@ Feature: Test SNS Command Adaptor - Service
- 
+
    Scenario: ServiceRecord
      Given template StreamIngestRecord with the base file "sns-multiple.input"
 -    And template EoriCdlzLandingRecord with the base file "eori.input"
@@ -7102,14 +7102,14 @@ index 2b10db16..e7f1ca14 100644
      When StreamIngestRecord source data is presented with attributes as per the template to the input topic with prefix fdp-sns-input
      Then 6 Service SNAPSHOTS will be emitted
      And one Service record for "SNS-ITEM" with following attributes
--- 
+--
 GitLab
 
 
 From f732cc741f4274c97b5b74622e4f31baee5dabc6 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 15:36:28 +0100
-Subject: [PATCH 40/56] CST-2357 test: speed up SNS integration startup and
+Subject: [PATCH 40/58] CST-2357 test: speed up SNS integration startup and
  readiness checks
 
          - start Redis and ZooKeeper concurrently
@@ -7208,7 +7208,7 @@ index 666b2e2d..f41c7f5b 100644
 -            kafkaConsumerServiceSnapshot = new KafkaConsumer(consumerConfig);
 -            kafkaConsumerRunlogCmd = new KafkaConsumer(consumerConfig);
 +            consumerConfig.put("max.poll.records", 10);
- 
+
              kafkaConsumerPartyCmd = (KafkaConsumer<PoleV2IdRecord, CmdPartyPoleRecord>) awakeConsumer(partyCmdTopic);
              kafkaConsumerObjectCmd =
 @@ -374,31 +365,31 @@ public class SnsSteps implements EventListener {
@@ -7217,7 +7217,7 @@ index 666b2e2d..f41c7f5b 100644
          log.info("Waiting for readiness at {} or {}", readinessUrl, profileReadinessUrl);
 -        HttpClient client = HttpClient.newHttpClient();
 +        String[] readinessUrls = {readinessUrl, profileReadinessUrl};
- 
+
          int maxAttempts = 90; // up to ~90s
          int delayMs = 1000;
          String lastFailure = "No successful readiness response";
@@ -7293,7 +7293,7 @@ index 666b2e2d..f41c7f5b 100644
 -            return records;
 +        return records;
      }
- 
+
      private Set<EntryRecord> pollForRunlogRecords(final int number) {
          Set<EntryRecord> runlogRecords = new LinkedHashSet<>();
          int index = 0;
@@ -7309,7 +7309,7 @@ index 666b2e2d..f41c7f5b 100644
 +                log.debug("Runlog record id = {}, has testId header = {}",
                          rec.value().getMetadata().getIdentityRecord().getId(),
                          haveTestIdHeader(rec));
- 
+
                  if (haveTestIdHeader(rec)) {
                      runlogRecords.add(rec.value());
 +                    if (runlogRecords.size() >= number) {
@@ -7331,12 +7331,12 @@ index 956f9a7b..fb9bd752 100644
      private static final Duration READINESS_TIMEOUT = Duration.ofSeconds(120);
 +    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(2);
 +    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
- 
+
      private static GenericContainer<?> commandAdaptor;
- 
+
 @@ -83,7 +85,6 @@ class BuiltImageRuntimeIntegrationTest {
      }
- 
+
      private static void waitForReady(String readinessPath) {
 -        HttpClient client = HttpClient.newHttpClient();
          long deadline = System.nanoTime() + READINESS_TIMEOUT.toNanos();
@@ -7357,7 +7357,7 @@ index 956f9a7b..fb9bd752 100644
                      return;
 @@ -112,7 +113,7 @@ class BuiltImageRuntimeIntegrationTest {
              }
- 
+
              try {
 -                Thread.sleep(1000L);
 +                Thread.sleep(500L);
@@ -7376,13 +7376,13 @@ index 06dc565b..1af0e31e 100644
 +    private static final long READINESS_POLL_INTERVAL_MS = 500L;
 +    private static final int AGGREGATE_READINESS_MAX_ATTEMPTS = 240;
 +    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
- 
+
      private static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse(REDIS_IMAGE))
              .withNetwork(NETWORK)
 @@ -444,17 +448,19 @@ public final class SnsTestcontainersEnvironment {
- 
+
          LOG.info("Waiting for aggregate readiness: type={}, host={}, port={}", aggregateType, host, port);
- 
+
 -        HttpClient client = HttpClient.newHttpClient();
 -        int maxAttempts = 120;
 -        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -7397,7 +7397,7 @@ index 06dc565b..1af0e31e 100644
 +                    aggregateType,
 +                    attempt,
 +                    AGGREGATE_READINESS_MAX_ATTEMPTS);
- 
+
              try {
 -                Thread.sleep(1000L);
 +                Thread.sleep(READINESS_POLL_INTERVAL_MS);
@@ -7407,7 +7407,7 @@ index 06dc565b..1af0e31e 100644
 @@ -464,16 +470,16 @@ public final class SnsTestcontainersEnvironment {
          throw new IllegalStateException("Timed out waiting for aggregate readiness: " + aggregateType);
      }
- 
+
 -    private static boolean isReadinessUp(HttpClient client, String host, int port, String path) {
 +    private static boolean isReadinessUp(String host, int port, String path) {
          try {
@@ -7419,7 +7419,7 @@ index 06dc565b..1af0e31e 100644
 +                    .header("Accept", "application/json")
 +                    .timeout(HTTP_REQUEST_TIMEOUT)
                      .build();
- 
+
 -            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 +            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
              return response.statusCode() == 200
@@ -7448,7 +7448,7 @@ index 06dc565b..1af0e31e 100644
              if (registerResponse.statusCode() != 200) {
                  throw new IllegalStateException("Schema registration failed: " + registerResponse.body());
              }
- 
+
              HttpRequest readRequest = HttpRequest.newBuilder()
                      .uri(URI.create(schemaRegistryUrl + "/subjects/" + subject + "/versions/latest"))
 +                    .timeout(HTTP_REQUEST_TIMEOUT)
@@ -7459,23 +7459,23 @@ index 06dc565b..1af0e31e 100644
              if (readResponse.statusCode() != 200 || !readResponse.body().contains("Smoke")) {
                  throw new IllegalStateException("Schema Registry round trip validation failed");
              }
--- 
+--
 GitLab
 
 
 From 5986674c37d6a9e9207fc6918bfaa24087af83bf Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 15:53:45 +0100
-Subject: [PATCH 41/56] chore: rerun pipeline
+Subject: [PATCH 41/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From 95e35e7c83a87f42ff717b0d7247afaeb402af57 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 16:18:49 +0100
-Subject: [PATCH 42/56] CST-2357 test: speed up SNS integration startup and
+Subject: [PATCH 42/58] CST-2357 test: speed up SNS integration startup and
  readiness checks           rollback drone changes
 
 ---
@@ -7495,14 +7495,14 @@ index 0ce27b3f..c2043b84 100644
                  'TEST_DURATION=$(($(date +%s)-TEST_START))',
                  'echo "CI_TIMING name=testcontainers_verify duration_seconds=$${TEST_DURATION}"'
              ],
--- 
+--
 GitLab
 
 
 From 76e8498a0378da240e94ecb6167bb0b518432d3a Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 17:14:17 +0100
-Subject: [PATCH 43/56] CST-2357 test: speed up SNS integration fix
+Subject: [PATCH 43/58] CST-2357 test: speed up SNS integration fix
 
 ---
  .../uk/gov/ho/dacc/fdp/steps/SnsSteps.java    |  5 +-
@@ -7531,14 +7531,14 @@ index f41c7f5b..8610f642 100644
              closeQuietly(kafkaConsumerPartyCmd);
              closeQuietly(kafkaConsumerObjectCmd);
 @@ -352,7 +353,7 @@ public class SnsSteps implements EventListener {
- 
+
      private static void closeQuietly(KafkaConsumer<?, ?> consumer) {
          if (consumer != null) {
 -            consumer.close();
 +            consumer.close(KAFKA_CLIENT_CLOSE_TIMEOUT);
          }
      }
- 
+
 diff --git a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 index 1af0e31e..05b6a1c5 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
@@ -7552,19 +7552,19 @@ index 1af0e31e..05b6a1c5 100644
 +    private static final long APP_CLIENT_SHUTDOWN_POLL_MS = 100L;
      private static final int AGGREGATE_READINESS_MAX_ATTEMPTS = 240;
      private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
- 
+
 @@ -279,6 +281,7 @@ public final class SnsTestcontainersEnvironment {
              applicationContext.close();
              applicationContext = null;
              applicationStarted = false;
 +            awaitApplicationKafkaClientsToStop();
          }
- 
+
          stopContainer(AGGREGATE_SERVICE);
 @@ -307,6 +310,49 @@ public final class SnsTestcontainersEnvironment {
          }
      }
- 
+
 +    private static void awaitApplicationKafkaClientsToStop() {
 +        final long deadlineNanos = System.nanoTime() + APP_CLIENT_SHUTDOWN_TIMEOUT.toNanos();
 +        List<String> activeKafkaThreads = getActiveApplicationKafkaThreads();
@@ -7611,14 +7611,14 @@ index 1af0e31e..05b6a1c5 100644
      public static synchronized void shutdown() {
          stopAll();
          if (!networkClosed) {
--- 
+--
 GitLab
 
 
 From adb91e11adc52994336ab45439422cb1fe5dbbd7 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 18:29:25 +0100
-Subject: [PATCH 44/56] CST-2357 test: speed up SNS integration fix
+Subject: [PATCH 44/58] CST-2357 test: speed up SNS integration fix
 
 ---
  .../SnsTestcontainersEnvironment.java         | 96 +++++++++++++------
@@ -7629,7 +7629,7 @@ index 05b6a1c5..05d231d2 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 +++ b/cmd-adaptor-sns-integration-tests/src/test/java/uk/gov/ho/dacc/fdp/testcontainers/SnsTestcontainersEnvironment.java
 @@ -2,9 +2,11 @@ package uk.gov.ho.dacc.fdp.testcontainers;
- 
+
  import org.apache.kafka.clients.admin.AdminClient;
  import org.apache.kafka.clients.admin.NewTopic;
 +import org.apache.kafka.streams.KafkaStreams;
@@ -7645,7 +7645,7 @@ index 05b6a1c5..05d231d2 100644
  import org.testcontainers.utility.DockerImageName;
  import uk.gov.ho.dacc.fdp.CmdAdaptorApplication;
 +import uk.gov.ho.dacc.fdp.fdp_commons.config.KafkaStreamConfig;
- 
+
  import java.net.URI;
  import java.net.InetAddress;
 @@ -64,9 +67,9 @@ public final class SnsTestcontainersEnvironment {
@@ -7659,9 +7659,9 @@ index 05b6a1c5..05d231d2 100644
 -    private static final long APP_CLIENT_SHUTDOWN_POLL_MS = 100L;
      private static final int AGGREGATE_READINESS_MAX_ATTEMPTS = 240;
      private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
- 
+
 @@ -278,10 +281,11 @@ public final class SnsTestcontainersEnvironment {
- 
+
      public static synchronized void stopAll() {
          if (applicationContext != null) {
 -            applicationContext.close();
@@ -7672,12 +7672,12 @@ index 05b6a1c5..05d231d2 100644
              applicationStarted = false;
 -            awaitApplicationKafkaClientsToStop();
          }
- 
+
          stopContainer(AGGREGATE_SERVICE);
 @@ -310,41 +314,79 @@ public final class SnsTestcontainersEnvironment {
          }
      }
- 
+
 -    private static void awaitApplicationKafkaClientsToStop() {
 -        final long deadlineNanos = System.nanoTime() + APP_CLIENT_SHUTDOWN_TIMEOUT.toNanos();
 -        List<String> activeKafkaThreads = getActiveApplicationKafkaThreads();
@@ -7706,7 +7706,7 @@ index 05b6a1c5..05d231d2 100644
 +
 +        waitForKafkaStreamsToStop(kafkaStreams);
      }
- 
+
 -    private static List<String> getActiveApplicationKafkaThreads() {
 -        final String threadPrefix = "fdp-cmd-adaptor-sns-" + TOPIC_SUFFIX;
 -        List<String> active = new ArrayList<>();
@@ -7761,7 +7761,7 @@ index 05b6a1c5..05d231d2 100644
          }
          return active;
      }
- 
+
 +    private static KafkaStreams.State safeState(KafkaStreams stream) {
 +        try {
 +            return stream.state();
@@ -7777,23 +7777,23 @@ index 05b6a1c5..05d231d2 100644
      private static void sleepUninterruptibly(long sleepMs) {
          try {
              Thread.sleep(sleepMs);
--- 
+--
 GitLab
 
 
 From c32267595e04718818f6503a163138ff142e2df4 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 18:37:42 +0100
-Subject: [PATCH 45/56] chore: rerun pipeline
+Subject: [PATCH 45/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From f136049c8ca7243cbd4f4173621895c4277d69ef Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 19:40:28 +0100
-Subject: [PATCH 46/56] CST-2357 test: speed up SNS integration fix
+Subject: [PATCH 46/58] CST-2357 test: speed up SNS integration fix
 
 ---
  .drone.star                               |  8 ++++++--
@@ -7871,7 +7871,7 @@ index 48cf1842..d68d6d86 100644
 @@ -155,6 +156,29 @@
          </dependency>
      </dependencies>
- 
+
 +    <profiles>
 +        <profile>
 +            <id>ci-local-install-artifacts</id>
@@ -7895,26 +7895,26 @@ index 48cf1842..d68d6d86 100644
 +        </profile>
 +    </profiles>
 +
- 
+
      <repositories>
          <repository>
--- 
+--
 GitLab
 
 
 From 2d7113ac82e442c053bb7e1fc0a2b515f4dd62ca Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 19:48:10 +0100
-Subject: [PATCH 47/56] chore: rerun pipeline
+Subject: [PATCH 47/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From 8dc05df64d57b3ca99d66ac53941c61fdf44e437 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 20:41:42 +0100
-Subject: [PATCH 48/56] CST-2357 test: speed up SNS integration fix
+Subject: [PATCH 48/58] CST-2357 test: speed up SNS integration fix
 
 ---
  .drone.star                                   |  3 ++-
@@ -7989,7 +7989,7 @@ index 3dc8eb9f..7b950daa 100644
 @@ -8,6 +10,15 @@
          </layout>
      </appender>
- 
+
 +    <logger name="io.confluent.kafka.serializers.KafkaAvroSerializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
 +    <logger name="io.confluent.kafka.serializers.KafkaAvroDeserializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
 +    <logger name="org.apache.kafka.common.config" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
@@ -8032,23 +8032,23 @@ index 00000000..b2e9abe5
 +    </root>
 +</configuration>
 +
--- 
+--
 GitLab
 
 
 From aa14e4c3b7c59661f7b6686194ed42973d919690 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 20:47:41 +0100
-Subject: [PATCH 49/56] chore: rerun pipeline
+Subject: [PATCH 49/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From 1234bc159abc5d11a2b229db8e74af089b9cf72b Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 21:11:49 +0100
-Subject: [PATCH 50/56] CST-2357 test: speed up SNS integration fix
+Subject: [PATCH 50/58] CST-2357 test: speed up SNS integration fix
 
 ---
  .../uk/gov/ho/dacc/fdp/steps/SnsSteps.java    | 56 ++++++++++++++++---
@@ -8069,7 +8069,7 @@ index 8610f642..9690f6f1 100644
 +        log.debug("SNS StreamIngestRecord payload: {}", landingRecord);
          return landingRecord;
      }
- 
+
 @@ -265,7 +266,8 @@ public class SnsSteps implements EventListener {
          CdlzLandingRecord.Builder landingRecordBuilder = CdlzLandingRecord.newBuilder();
          avroObjectBuilder.buildItem(landingRecordBuilder, sourceDataTableMap);
@@ -8079,7 +8079,7 @@ index 8610f642..9690f6f1 100644
 +        log.debug("EORI CdlzLandingRecord payload: {}", landingRecord);
          return landingRecord;
      }
- 
+
 @@ -611,8 +613,9 @@ public class SnsSteps implements EventListener {
      @And("one {commandOutputType} record for {string} with following attributes")
      public void oneRecordWithFollowingAttributes(String poleType, String mappingName,
@@ -8090,7 +8090,7 @@ index 8610f642..9690f6f1 100644
 +                poleType, mappingName, testId);
 +        log.debug("Expected attributes for {} {}: {}", poleType, mappingName, targetDataTableMap);
          final AtomicBoolean processed = new AtomicBoolean();
- 
+
          switch (poleType) {
 @@ -622,7 +625,14 @@ public class SnsSteps implements EventListener {
                  partyRecords.stream()
@@ -8177,7 +8177,7 @@ index 7b950daa..430ead18 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/resources/logback-test.xml
 +++ b/cmd-adaptor-sns-integration-tests/src/test/resources/logback-test.xml
 @@ -12,8 +12,6 @@
- 
+
      <logger name="io.confluent.kafka.serializers.KafkaAvroSerializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
      <logger name="io.confluent.kafka.serializers.KafkaAvroDeserializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
 -    <logger name="org.apache.kafka.common.config" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
@@ -8198,9 +8198,9 @@ index 157cddbc..42035773 100644
 +        log.debug("StreamIngestRecord payload: {}", landingRecord);
          return landingRecord;
      }
- 
+
 @@ -285,8 +286,9 @@ public class IntegrationTestSteps implements EventListener {
- 
+
      @SuppressWarnings("unchecked")
      public void checkRecordData(String poleType, String dataType, final Map<String, String> targetDataTableMap, boolean isPoleV2Id) {
 -        log.info("And executing step [one {} record for {} with {} following attributes]", poleType,
@@ -8209,7 +8209,7 @@ index 157cddbc..42035773 100644
 +                poleType, dataType, testId);
 +        log.debug("Expected attributes for {} {}: {}", poleType, dataType, targetDataTableMap);
          final AtomicBoolean processed = new AtomicBoolean();
- 
+
          switch (poleType) {
 @@ -295,7 +297,7 @@ public class IntegrationTestSteps implements EventListener {
                  partyRecords.stream()
@@ -8256,23 +8256,23 @@ index 157cddbc..42035773 100644
                              if (isPoleV2Id) {
                                  checkPoleV2Id(testServiceRecord, targetDataTableMap);
                              } else {
--- 
+--
 GitLab
 
 
 From 4104648c886e52bb4e8cb33dd60d14effe1f616b Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 21:36:29 +0100
-Subject: [PATCH 51/56] chore: rerun pipeline
+Subject: [PATCH 51/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From 14ebe5e4071ccd9b78a6e1907c9a01512fd5b6ab Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 21:46:26 +0100
-Subject: [PATCH 52/56] Revert "CST-2357 test: speed up SNS integration fix"
+Subject: [PATCH 52/58] Revert "CST-2357 test: speed up SNS integration fix"
 
 This reverts commit 1234bc159abc5d11a2b229db8e74af089b9cf72b.
 ---
@@ -8294,7 +8294,7 @@ index 9690f6f1..8610f642 100644
 +        log.info("SNS StreamIngestRecord: {}", landingRecord);
          return landingRecord;
      }
- 
+
 @@ -266,8 +265,7 @@ public class SnsSteps implements EventListener {
          CdlzLandingRecord.Builder landingRecordBuilder = CdlzLandingRecord.newBuilder();
          avroObjectBuilder.buildItem(landingRecordBuilder, sourceDataTableMap);
@@ -8304,7 +8304,7 @@ index 9690f6f1..8610f642 100644
 +        log.info("EORI CdlzLandingRecord: {}", landingRecord);
          return landingRecord;
      }
- 
+
 @@ -613,9 +611,8 @@ public class SnsSteps implements EventListener {
      @And("one {commandOutputType} record for {string} with following attributes")
      public void oneRecordWithFollowingAttributes(String poleType, String mappingName,
@@ -8315,7 +8315,7 @@ index 9690f6f1..8610f642 100644
 +        log.info("And executing step [one {} record for {} with {} following attributes]", poleType, mappingName,
 +                targetDataTableMap);
          final AtomicBoolean processed = new AtomicBoolean();
- 
+
          switch (poleType) {
 @@ -625,14 +622,7 @@ public class SnsSteps implements EventListener {
                  partyRecords.stream()
@@ -8402,7 +8402,7 @@ index 430ead18..7b950daa 100644
 --- a/cmd-adaptor-sns-integration-tests/src/test/resources/logback-test.xml
 +++ b/cmd-adaptor-sns-integration-tests/src/test/resources/logback-test.xml
 @@ -12,6 +12,8 @@
- 
+
      <logger name="io.confluent.kafka.serializers.KafkaAvroSerializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
      <logger name="io.confluent.kafka.serializers.KafkaAvroDeserializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
 +    <logger name="org.apache.kafka.common.config" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
@@ -8423,9 +8423,9 @@ index 42035773..157cddbc 100644
 +        log.info(landingRecord.toString());
          return landingRecord;
      }
- 
+
 @@ -286,9 +285,8 @@ public class IntegrationTestSteps implements EventListener {
- 
+
      @SuppressWarnings("unchecked")
      public void checkRecordData(String poleType, String dataType, final Map<String, String> targetDataTableMap, boolean isPoleV2Id) {
 -        log.info("And executing step [one {} record for {} with following attributes], testId={}",
@@ -8434,7 +8434,7 @@ index 42035773..157cddbc 100644
 +        log.info("And executing step [one {} record for {} with {} following attributes]", poleType,
 +                dataType, targetDataTableMap);
          final AtomicBoolean processed = new AtomicBoolean();
- 
+
          switch (poleType) {
 @@ -297,7 +295,7 @@ public class IntegrationTestSteps implements EventListener {
                  partyRecords.stream()
@@ -8481,14 +8481,14 @@ index 42035773..157cddbc 100644
                              if (isPoleV2Id) {
                                  checkPoleV2Id(testServiceRecord, targetDataTableMap);
                              } else {
--- 
+--
 GitLab
 
 
 From 9a637571fd234a784cae3de4a746fb82a21683ca Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 21:46:26 +0100
-Subject: [PATCH 53/56] Revert "CST-2357 test: speed up SNS integration fix"
+Subject: [PATCH 53/58] Revert "CST-2357 test: speed up SNS integration fix"
 
 This reverts commit 8dc05df64d57b3ca99d66ac53941c61fdf44e437.
 ---
@@ -8564,7 +8564,7 @@ index 7b950daa..3dc8eb9f 100644
 @@ -10,15 +8,6 @@
          </layout>
      </appender>
- 
+
 -    <logger name="io.confluent.kafka.serializers.KafkaAvroSerializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
 -    <logger name="io.confluent.kafka.serializers.KafkaAvroDeserializerConfig" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
 -    <logger name="org.apache.kafka.common.config" level="${SNS_KAFKA_CONFIG_LOG_LEVEL}"/>
@@ -8607,23 +8607,23 @@ index b2e9abe5..00000000
 -    </root>
 -</configuration>
 -
--- 
+--
 GitLab
 
 
 From 70beaf5e1f2f6550115b2e31a311db4df3eddf68 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 21:54:13 +0100
-Subject: [PATCH 54/56] chore: rerun pipeline
+Subject: [PATCH 54/58] chore: rerun pipeline
 
--- 
+--
 GitLab
 
 
 From d8d0c5c3f8824ddfa6fcdf6f0636580d72dfd465 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 22:23:48 +0100
-Subject: [PATCH 55/56] CST-2357 test: speed up SNS integration fix
+Subject: [PATCH 55/58] CST-2357 test: speed up SNS integration fix
 
 ---
  .drone.star         |  5 ++++-
@@ -8663,11 +8663,11 @@ index 5481ef39..a276857c 100755
 @@ -6,11 +6,26 @@
  # See https://gitlab.digital.homeoffice.gov.uk/dacc-de/dde-adaptor-reposync
  #############################################################################
- 
+
 -echo "| Aggregator Core | $(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=aggregator-core.version -q -DforceStdout) |"
 -echo "| FDP BOM | $(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=fdp-bom.version -q -DforceStdout) |"
 +MAVEN_REPO_LOCAL="${MAVEN_REPO_LOCAL:-.m2}"
- 
+
 -CDLZ_AVRO_SCHEMAS_VERSION="$(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=cdlz-avro-schemas.version -q -DforceStdout)"
 -[[ "$CDLZ_AVRO_SCHEMAS_VERSION" == "null object or invalid expression" ]] && CDLZ_AVRO_SCHEMAS_VERSION='N/A'
 -echo "| CDLZ Avro Schemas | ${CDLZ_AVRO_SCHEMAS_VERSION} |"
@@ -8685,7 +8685,7 @@ index 5481ef39..a276857c 100755
 +FDP_BOM_VERSION=$(echo "$POM_PROPERTIES" | cut -d: -f2)
 +CDLZ_AVRO_SCHEMAS_VERSION=$(echo "$POM_PROPERTIES" | cut -d: -f3)
 +FDP_COMMONS_VERSION=$(echo "$POM_PROPERTIES" | cut -d: -f4)
- 
+
 -echo "| FDP Commons | $(mvn org.apache.maven.plugins:maven-help-plugin:3.2.0:evaluate -Dexpression=fdp-commons.version -q -DforceStdout) |"
 +[ "$CDLZ_AVRO_SCHEMAS_VERSION" = "null object or invalid expression" ] && CDLZ_AVRO_SCHEMAS_VERSION='N/A'
 +
@@ -8693,15 +8693,82 @@ index 5481ef39..a276857c 100755
 +echo "| FDP BOM | ${FDP_BOM_VERSION} |"
 +echo "| CDLZ Avro Schemas | ${CDLZ_AVRO_SCHEMAS_VERSION} |"
 +echo "| FDP Commons | ${FDP_COMMONS_VERSION} |"
--- 
+--
 GitLab
 
 
 From e0ee3dc90ba4839d120d944df5c78399433e0366 Mon Sep 17 00:00:00 2001
 From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
 Date: Thu, 13 Aug 2026 22:30:24 +0100
-Subject: [PATCH 56/56] chore: rerun pipeline
+Subject: [PATCH 56/58] chore: rerun pipeline
 
--- 
+--
+GitLab
+
+
+From f65eb94586c74b8997189a29f10fc16847b37192 Mon Sep 17 00:00:00 2001
+From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
+Date: Thu, 13 Aug 2026 22:57:17 +0100
+Subject: [PATCH 57/58] CST-2357 test: speed up SNS integration fix
+
+---
+ .drone.star | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/.drone.star b/.drone.star
+index 1c752431..8b40d4c1 100644
+--- a/.drone.star
++++ b/.drone.star
+@@ -178,6 +178,23 @@ def ci_pipeline(ctx):
+         }
+     )
+
++    response = add_pipeline_step(
++        response,
++        {
++            'name': 'Prepare Trivy DB',
++            'image': TRIVY_IMAGE,
++            'commands': [
++                'export TRIVY_CACHE_DIR="$${PWD}/.cache/trivy"',
++                'mkdir -p "$${TRIVY_CACHE_DIR}"',
++                'trivy image --download-db-only --no-progress --cache-dir "$${TRIVY_CACHE_DIR}" --db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db',
++                'trivy image --download-java-db-only --no-progress --cache-dir "$${TRIVY_CACHE_DIR}" --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db'
++            ],
++            'depends_on': [
++                'Retrieve Artifactory Secrets'
++            ]
++        }
++    )
++
+     response = add_pipeline_step(
+         response,
+         {
+@@ -304,11 +321,14 @@ def ci_pipeline(ctx):
+         {
+             'name': 'Scan with Trivy',
+             'depends_on': [
+-                'Validate Built Image Runtime'
++                'Validate Built Image Runtime',
++                'Prepare Trivy DB'
+             ],
+             'commands': [
+                 # PM-75944: updated application to use ecr trivy db
+-                'trivy image --exit-code 0 --no-progress docker-compose-command-adaptor:latest --severity CRITICAL,HIGH --ignore-unfixed --db-repository  acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db'
++                'export TRIVY_CACHE_DIR="$${PWD}/.cache/trivy"',
++                'mkdir -p "$${TRIVY_CACHE_DIR}"',
++                'trivy image --exit-code 0 --no-progress --cache-dir "$${TRIVY_CACHE_DIR}" docker-compose-command-adaptor:latest --severity CRITICAL,HIGH --ignore-unfixed --db-repository  acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-db --java-db-repository acp-zot-helm.acp-zot.svc.cluster.local/ecr/aquasecurity/trivy-java-db'
+             ],
+             'image': TRIVY_IMAGE,
+             'environment': {
+--
+GitLab
+
+
+From 34e51298a5a02ae7ded63a74a8a69f56bd4ca262 Mon Sep 17 00:00:00 2001
+From: d-aktasb <benan.aktas@digital.homeoffice.gov.uk>
+Date: Thu, 13 Aug 2026 23:33:15 +0100
+Subject: [PATCH 58/58] chore: rerun pipeline
+
+--
 GitLab
 
