@@ -32,7 +32,7 @@ target/**
 pom.xml
 ```
 
-Docker input is now restricted to the two runtime artefacts. BuildKit reported a **189 B** content-store observation in the controlled measurement.
+The runtime payload from `target` is restricted to the application JAR and OpenTelemetry agent, while unrelated source/build content is excluded. BuildKit reported a **189 B** content-store observation in the controlled measurement.
 
 > **Impact — Direct controlled Docker measurement:** The input was substantially narrowed. This is not a universal CI network-transfer saving; the cold build remained broadly similar and the image remained approximately **906 MB**.
 

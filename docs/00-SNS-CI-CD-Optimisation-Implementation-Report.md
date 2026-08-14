@@ -16,7 +16,7 @@ The optimisation retains the Cucumber business suite, exact built-image runtime 
 
 ```mermaid
 flowchart LR
-    subgraph BEFORE["Before — Compose-heavy orchestration"]
+    subgraph BEFORE["Before — conceptual execution model"]
         direction TB
         B1["Secrets and Docker readiness"] --> B2["Compose infrastructure"]
         B2 --> B3["Maven build"]
